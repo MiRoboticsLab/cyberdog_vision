@@ -43,6 +43,6 @@ private:
   char * shm_addr_;
 };
 
-}  // cyberdog_vision
+}  // namespace cyberdog_vision
 
 #endif  // CYBERDOG_VISION__VISION_MANAGER_HPP_
