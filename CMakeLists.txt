@@ -28,6 +28,7 @@ add_subdirectory(3rdparty)
 # find_package(<dependency> REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(protocol REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 find_package(CUDA REQUIRED)
 find_package(XmBody REQUIRED)
@@ -68,8 +69,8 @@ add_executable(test_ai
   src/person_reid.cpp
 )
 
-ament_target_dependencies(vision_manager rclcpp OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID)
-ament_target_dependencies(test_ai rclcpp OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID)
+ament_target_dependencies(vision_manager rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID)
+ament_target_dependencies(test_ai rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID)
 
 install(TARGETS
   vision_manager
