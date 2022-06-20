@@ -16,6 +16,7 @@
 
 namespace cyberdog_vision
 {
+
 GestureRecognition::GestureRecognition(const std::string & model_det, const std::string & model_cls)
 {
   gesture_ptr_ = std::make_shared<Hand_Gesture_Classification_Node>(model_det, model_cls);
@@ -36,6 +37,7 @@ int GestureRecognition::GetGestureInfo(
     infer_bbox.score = body.score;
     infer_bboxes.push_back(infer_bbox);
   }
+
   XMImage xm_img;
   ImgConvert(img, xm_img);
   gesture_ptr_->Inference(xm_img, infer_bboxes);
@@ -43,9 +45,12 @@ int GestureRecognition::GetGestureInfo(
   if (gesture_cls == GestureLabel::kInvalid) {
     return -1;
   }
+
   std::vector<float> position = gesture_ptr_->GetHandPositions();
-  gesture_box = cv::Rect(position[0], position[1], position[2] - position[0],
-      position[3] - position[1]);
+  gesture_box = cv::Rect(
+    position[0], position[1], position[2] - position[0],
+    position[3] - position[1]);
+
   return 0;
 }
 

@@ -35,15 +35,17 @@ public:
   ~PersonReID();
 
   int SetTracker(const cv::Mat & img, const cv::Rect & body_box, std::vector<float> & reid_feat);
-  int GetReIDInfo(const cv::Mat & img, const std::vector<InferBbox> & body_bboxes, int & id);
+  int GetReIDInfo(
+    const cv::Mat & img, const std::vector<InferBbox> & body_bboxes, int & id,
+    size_t & index);
   int GetFeatureLen();
   void ResetTracker();
 
 private:
   int GetFeature(const cv::Mat & img, const cv::Rect & body_box, std::vector<float> & reid_feat);
   float GetSim(
-    std::vector<float> & feat_det, std::vector<float> & feat_library,
-    const SimType & sim_type);
+    std::vector<float> & feat_det,
+    std::vector<float> & feat_library, const SimType & sim_type);
 
   int gpu_id_;
   int tracking_id_;
@@ -52,6 +54,7 @@ private:
   int unmatch_count_;
   float feat_sim_th_;
   float feat_update_th_;
+  bool is_tracking_;
 
   void * reid_ptr_;
   std::vector<float> tracker_feat_;

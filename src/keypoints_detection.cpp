@@ -32,10 +32,12 @@ void KeypointsDetection::GetKeypointsInfo(
   std::vector<pbox> infer_bboxes;
   for (auto & infer_bbox: body_boxes) {
     XMPoint point_tl = XMPoint(infer_bbox.body_box.x, infer_bbox.body_box.y);
-    XMPoint point_br = XMPoint(infer_bbox.body_box.x + infer_bbox.body_box.width,
-        infer_bbox.body_box.y + infer_bbox.body_box.height);
+    XMPoint point_br = XMPoint(
+      infer_bbox.body_box.x + infer_bbox.body_box.width,
+      infer_bbox.body_box.y + infer_bbox.body_box.height);
     infer_bboxes.push_back({point_tl, point_br});
   }
+
   bool is_save_keypoints = false;
   bool is_show_names = false;
   keypoints_ptr_->Inference(xm_img, infer_bboxes, is_save_keypoints, is_show_names);

@@ -18,6 +18,8 @@
 #include <opencv2/opencv.hpp>
 
 #include "rclcpp/rclcpp.hpp"
+#include "protocol/msg/body.hpp"
+#include "protocol/msg/body_info.hpp"
 #include "protocol/srv/body_region.hpp"
 
 #include "cyberdog_vision/shared_memory_op.hpp"
@@ -30,6 +32,8 @@
 namespace cyberdog_vision
 {
 
+using BodyInfoT = protocol::msg::Body;
+using BodyFrameInfoT = protocol::msg::BodyInfo;
 using BodyRegionT = protocol::srv::BodyRegion;
 
 class VisionManager : public rclcpp::Node
@@ -44,18 +48,21 @@ private:
   void BodyDet();
   void ReIDProc();
 
+  int GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi);
+  void PublishResult(const BodyResults & body_results, int & person_id, size_t & person_index);
+
   void TrackingService(
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<BodyRegionT::Request> req,
     std::shared_ptr<BodyRegionT::Response> res);
 
-  int GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi);
-
 private:
+  rclcpp::Service<BodyRegionT>::SharedPtr tracking_service_;
+  rclcpp::Publisher<BodyFrameInfoT>::SharedPtr body_pub_;
+
   std::shared_ptr<std::thread> img_proc_thread_;
   std::shared_ptr<std::thread> body_det_thread_;
   std::shared_ptr<std::thread> reid_thread_;
-
   std::shared_ptr<BodyDetection> body_ptr_;
   std::shared_ptr<PersonReID> reid_ptr_;
 
@@ -68,9 +75,6 @@ private:
 
   size_t buff_size_;
   bool is_tracking_;
-
-private:
-  rclcpp::Service<BodyRegionT>::SharedPtr tracking_service_;
 
 };
 

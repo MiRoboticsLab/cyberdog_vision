@@ -28,6 +28,11 @@ BodyDetection::BodyDetection(const std::string & model_det, const std::string & 
 
 int BodyDetection::Detect(const cv::Mat & img, BodyFrameInfo & infos)
 {
+  if (img.empty()) {
+    std::cout << "Image is empty cannot perform detection. " << std::endl;
+    return -1;
+  }
+
   XMImage xm_img;
   ImgConvert(img, xm_img);
   struct LogInfo log_info;
@@ -35,6 +40,7 @@ int BodyDetection::Detect(const cv::Mat & img, BodyFrameInfo & infos)
     std::cout << "Detacte body fail. " << std::endl;
     return -1;
   }
+
   return 0;
 }
 

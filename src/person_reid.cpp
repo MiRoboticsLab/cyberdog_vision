@@ -14,12 +14,13 @@
 
 #include "cyberdog_vision/person_reid.hpp"
 
+const int kFeatLen = 128;
 namespace cyberdog_vision
 {
 
 PersonReID::PersonReID(const std::string & model_reid)
-: gpu_id_(0), tracking_id_(0), object_loss_th_(300), library_frame_num_(15), unmatch_count_(0),
-  feat_sim_th_(0.8), feat_update_th_(0.9), reid_ptr_(nullptr)
+: gpu_id_(0), tracking_id_(0), object_loss_th_(1000), library_frame_num_(15), unmatch_count_(0),
+  feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), reid_ptr_(nullptr)
 {
   if (0 != REID_Init(reid_ptr_, model_reid.c_str(), gpu_id_)) {
     throw std::logic_error("Init person reid algo fial. ");
@@ -35,45 +36,63 @@ int PersonReID::SetTracker(
     return -1;
   }
   tracker_feat_.assign(reid_feat.begin(), reid_feat.end());
+  if (is_tracking_) {
+    tracking_id_++;
+  }
+  is_tracking_ = true;
+
   return 0;
 }
 
 int PersonReID::GetReIDInfo(
   const cv::Mat & img, const std::vector<InferBbox> & body_bboxes,
-  int & id)
+  int & id, size_t & index)
 {
   if (tracker_feat_.empty()) {
     std::cout << "Please set tracker before tracking. " << std::endl;
     return -1;
   }
+
   id = -1;
+  double max_sim = 0;
+  std::vector<float> match_feat;
   for (size_t i = 0; i < body_bboxes.size(); ++i) {
+    // For every body bbox
     std::vector<float> feat;
     if (0 != GetFeature(img, body_bboxes[i].body_box, feat)) {
       return -1;
     }
     if (0 != tracker_feat_.size()) {
       double sim_val = GetSim(feat, tracker_feat_, SimType::kSimOne2Group);
-      if (sim_val > feat_sim_th_) {
-        // Match success
-        unmatch_count_ = 0;
-        id = tracking_id_;
-        if (sim_val > feat_update_th_) {
-          // Update library feat
-          if ((int)tracker_feat_.size() / 128 == library_frame_num_) {
-            tracker_feat_.erase(tracker_feat_.begin(), tracker_feat_.begin() + 128);
-          }
-          tracker_feat_.insert(tracker_feat_.end(), feat.begin(), feat.end());
-        }
-      } else {
-        unmatch_count_++;
-        if (unmatch_count_ > object_loss_th_) {
-          std::cout << "Object is lost. " << std::endl;
-          ResetTracker();
-        }
+      std::cout << "Object " << i << " sim: " << sim_val << std::endl;
+      if (sim_val > max_sim) {
+        index = i;
+        max_sim = sim_val;
+        match_feat.assign(feat.begin(), feat.end());
       }
     } else {
       tracker_feat_.assign(feat.begin(), feat.end());
+    }
+  }
+
+  if (max_sim > feat_sim_th_) {
+    // Match success
+    std::cout << "Match success, sim: " << max_sim << std::endl;
+    unmatch_count_ = 0;
+    id = tracking_id_;
+    if (max_sim > feat_update_th_) {
+      // Update library feat
+      if ((int)tracker_feat_.size() / kFeatLen == library_frame_num_) {
+        tracker_feat_.erase(tracker_feat_.begin(), tracker_feat_.begin() + kFeatLen);
+      }
+      tracker_feat_.insert(tracker_feat_.end(), match_feat.begin(), match_feat.end());
+    }
+  } else {
+    std::cout << "Match fail, current count: " << unmatch_count_ << std::endl;
+    unmatch_count_++;
+    if (unmatch_count_ > object_loss_th_) {
+      std::cout << "Object is lost. " << std::endl;
+      ResetTracker();
     }
   }
   return 0;
@@ -86,6 +105,7 @@ int PersonReID::GetFeatureLen()
 
 void PersonReID::ResetTracker()
 {
+  is_tracking_ = false;
   tracker_feat_.clear();
   tracking_id_++;
 }
@@ -105,8 +125,9 @@ int PersonReID::GetFeature(
     std::cout << "Extract reid feature fail." << std::endl;
     return -1;
   }
+  reid_feat.resize(GetFeatureLen());
   if (feat != nullptr) {
-    memcpy(reid_feat.data(), feat, sizeof(float) * REID_GetFeatLen());
+    memcpy(reid_feat.data(), feat, sizeof(float) * GetFeatureLen());
     feat = nullptr;
   }
   return 0;
@@ -122,12 +143,14 @@ float PersonReID::GetSim(
       sim_value = REID_GetSimOfOne2One(reid_ptr_, feat_det.data(), feat_library.data());
       break;
     case SimType::kSimOne2Group:
-      sim_value = REID_GetSimOfOne2Group(reid_ptr_, feat_det.data(),
-          feat_library.data(), feat_library.size() / 128);
+      sim_value = REID_GetSimOfOne2Group(
+        reid_ptr_, feat_det.data(),
+        feat_library.data(), feat_library.size() / kFeatLen);
       break;
     case SimType::kSimGroup2Group:
-      sim_value = REID_GetSimOfGroup2Group(reid_ptr_, feat_det.data(),
-          feat_det.size() / 128, feat_library.data(), feat_library.size() / 128);
+      sim_value = REID_GetSimOfGroup2Group(
+        reid_ptr_, feat_det.data(),
+        feat_det.size() / kFeatLen, feat_library.data(), feat_library.size() / kFeatLen);
       break;
   }
   return sim_value;

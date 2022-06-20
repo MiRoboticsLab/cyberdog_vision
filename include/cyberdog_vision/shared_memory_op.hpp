@@ -77,6 +77,7 @@ inline int DetachShm(char * shm_addr)
     std::cout << "Detach the shared memory fail. " << std::endl;
     return -1;
   }
+
   return 0;
 }
 

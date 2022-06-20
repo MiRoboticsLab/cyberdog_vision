@@ -35,6 +35,7 @@ FaceRecognition::FaceRecognition(
   if (!face_ptr_->init(param)) {
     throw std::logic_error("Init face recognition algo fial. ");
   }
+
   std::string version;
   if (!face_ptr_->getVersion(version)) {
     std::cout << "Version of face sdk is " << version << std::endl;
