@@ -49,7 +49,6 @@ int FaceRecognition::GetFaceInfo(const cv::Mat & img, std::vector<EntryFaceInfo>
   if (!face_ptr_->getFaceInfo(xm_img, faces_info)) {
     return -1;
   }
-
   return 0;
 }
 
@@ -63,7 +62,6 @@ int FaceRecognition::GetRecognitionResult(
   if (!face_ptr_->getMatchInfo(xm_img, endlib_feats, faces_info)) {
     return -1;
   }
-
   return 0;
 }
 

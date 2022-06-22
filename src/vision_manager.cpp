@@ -25,7 +25,7 @@ namespace cyberdog_vision
 {
 
 VisionManager::VisionManager()
-: Node("vision_manager"), shm_addr_(nullptr), buff_size_(6), is_tracking_(false)
+: Node("vision_manager"), shm_addr_(nullptr), buf_size_(6), is_tracking_(false)
 {
   if (0 != Init()) {
     throw std::logic_error("Init shared memory or semaphore fail. ");
@@ -58,10 +58,10 @@ VisionManager::VisionManager()
 int VisionManager::Init()
 {
   // Create shared memory and get address
-  if (0 != CreateShm(SHM_PROJ_ID, sizeof(double) + IMAGE_SIZE, shm_id_)) {
+  if (0 != CreateShm(SHM_PROJ_ID, sizeof(uint64_t) + IMAGE_SIZE, shm_id_)) {
     return -1;
   }
-  shm_addr_ = GetShmAddr(shm_id_, sizeof(double) + IMAGE_SIZE);
+  shm_addr_ = GetShmAddr(shm_id_, sizeof(uint64_t) + IMAGE_SIZE);
   if (shm_addr_ == nullptr) {
     return -1;
   }
@@ -95,7 +95,11 @@ void VisionManager::ImageProc()
     WaitSem(sem_set_id_, 0);
     StampedImage simg;
     simg.img.create(480, 640, CV_8UC3);
-    memcpy(simg.img.data, (char *)shm_addr_ + sizeof(double), IMAGE_SIZE);
+    memcpy(simg.img.data, (char *)shm_addr_ + sizeof(uint64_t), IMAGE_SIZE);
+    uint64_t time;
+    memcpy(&time, (char *)shm_addr_, sizeof(uint64_t));
+    simg.header.stamp.sec = time / 1000000000;
+    simg.header.stamp.nanosec = time % 1000000000;
     SignalSem(sem_set_id_, 0);
     SignalSem(sem_set_id_, 1);
 
@@ -103,6 +107,8 @@ void VisionManager::ImageProc()
     std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
     global_img_buf_.img_buf.clear();
     global_img_buf_.img_buf.push_back(simg);
+    global_img_buf_.is_filled = true;
+    global_img_buf_.cond.notify_one();
   }
 }
 
@@ -112,30 +118,32 @@ void VisionManager::BodyDet()
     std::lock(global_img_buf_.mtx, body_results_.mtx);
     std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
     std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
-    if (!global_img_buf_.img_buf.empty()) {
-      BodyFrameInfo infos;
-      if (-1 != body_ptr_->Detect(global_img_buf_.img_buf[0].img, infos)) {
-        if (body_results_.body_infos.size() >= buff_size_) {
-          body_results_.body_infos.erase(body_results_.body_infos.begin());
-        }
-        // debug - visualization
-        // std::cout << "Detection result: " << std::endl;
-        // std::cout << "Person num: " << infos.size() << std::endl;
-        // cv::Mat img_show = global_img_buf_.img_buf[0].img.clone();
-        // for (auto & res : infos) {
-        //   cv::rectangle(
-        //     img_show, cv::Rect(res.left, res.top, res.width, res.height),
-        //     cv::Scalar(0, 0, 255));
-        // }
-        // cv::imshow("img", img_show);
-        // cv::waitKey(10);
-
-        body_results_.body_infos.push_back(infos);
-        body_results_.detection_img.img = global_img_buf_.img_buf[0].img.clone();
-        body_results_.cond.notify_one();
-      } else {
-        RCLCPP_WARN(get_logger(), "Body detect fail of current image. ");
+    global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
+    global_img_buf_.is_filled = false;
+    BodyFrameInfo infos;
+    if (-1 != body_ptr_->Detect(global_img_buf_.img_buf[0].img, infos)) {
+      if (body_results_.body_infos.size() >= buf_size_) {
+        body_results_.body_infos.erase(body_results_.body_infos.begin());
       }
+      // debug - visualization
+      // std::cout << "Detection result: " << std::endl;
+      // std::cout << "Person num: " << infos.size() << std::endl;
+      // cv::Mat img_show = global_img_buf_.img_buf[0].img.clone();
+      // for (auto & res : infos) {
+      //   cv::rectangle(
+      //     img_show, cv::Rect(res.left, res.top, res.width, res.height),
+      //     cv::Scalar(0, 0, 255));
+      // }
+      // cv::imshow("img", img_show);
+      // cv::waitKey(10);
+
+      body_results_.body_infos.push_back(infos);
+      body_results_.detection_img.img = global_img_buf_.img_buf[0].img.clone();
+      body_results_.detection_img.header = global_img_buf_.img_buf[0].header;
+      body_results_.is_filled = true;
+      body_results_.cond.notify_one();
+    } else {
+      RCLCPP_WARN(get_logger(), "Body detect fail of current image. ");
     }
   }
 }
@@ -144,10 +152,11 @@ void VisionManager::ReIDProc()
 {
   while (rclcpp::ok()) {
     std::unique_lock<std::mutex> lk(body_results_.mtx);
-    body_results_.cond.wait(lk, [this] {return !body_results_.body_infos.empty();});
+    body_results_.cond.wait(lk, [this] {return body_results_.is_filled;});
+    body_results_.is_filled = false;
     int person_id = -1;
     size_t person_index;
-    std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos[0]);
+    std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
     if (-1 !=
       reid_ptr_->GetReIDInfo(
         body_results_.detection_img.img, body_bboxes, person_id,
@@ -221,7 +230,8 @@ void VisionManager::PublishResult(
 {
   BodyFrameInfoT pub_infos;
   pub_infos.header = body_results.detection_img.header;
-  BodyFrameInfo curr_frame = body_results.body_infos[body_results.body_infos.size() - 1];
+    pub_infos.header.stamp.nanosec << std::endl;
+  BodyFrameInfo curr_frame = body_results.body_infos.back();
   pub_infos.count = curr_frame.size();
   for (size_t i = 0; i < pub_infos.count; ++i) {
     BodyInfoT body;

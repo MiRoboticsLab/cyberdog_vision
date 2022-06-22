@@ -31,13 +31,6 @@ namespace cyberdog_vision
 {
 
 using BodyFrameInfo = std::vector<HumanBodyInfo>;
-struct SingleBodyInfo
-{
-  std::string id;
-  float score;
-  cv::Rect rect;
-  std::vector<float> feats;
-};
 
 struct InferBbox
 {
@@ -53,16 +46,27 @@ struct StampedImage
 
 struct GlobalImageBuf
 {
+  bool is_filled;
   std::mutex mtx;
+  std::condition_variable cond;
   std::vector<StampedImage> img_buf;
+  GlobalImageBuf()
+  {
+    is_filled = false;
+  }
 };
 
 struct BodyResults
 {
+  bool is_filled;
   std::mutex mtx;
   std::condition_variable cond;
   StampedImage detection_img;
   std::vector<BodyFrameInfo> body_infos;
+  BodyResults()
+  {
+    is_filled = false;
+  }
 };
 
 inline void ImgConvert(const cv::Mat & img, XMImage & xm_img)

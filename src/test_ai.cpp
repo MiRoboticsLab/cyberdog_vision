@@ -24,7 +24,7 @@
 #include "cyberdog_vision/keypoints_detection.hpp"
 #include "cyberdog_vision/person_reid.hpp"
 
-const std::string PATH_PREFIX = "/home/mi/ros2_app/src/cyberdog_vision/3rdparty/";
+const std::string kPathPrefix = "/home/mi/ros2_app/src/cyberdog_vision/3rdparty/";
 
 using namespace cyberdog_vision;
 
@@ -32,8 +32,8 @@ int test_body(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_body===" << std::endl;
   BodyDetection body_ = BodyDetection(
-    PATH_PREFIX + "body_gesture/model/detect.onnx",
-    PATH_PREFIX + "body_gesture/model/cls_human_mid.onnx");
+    kPathPrefix + "body_gesture/model/detect.onnx",
+    kPathPrefix + "body_gesture/model/cls_human_mid.onnx");
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << file_names[i] << std::endl;
@@ -60,10 +60,10 @@ int test_face(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_face===" << std::endl;
   FaceRecognition face_ = FaceRecognition(
-    PATH_PREFIX + "face_recognition/model/detect/mnetv2_gray_nop_light_epoch_235_512.onnx",
-    PATH_PREFIX + "face_recognition/model/landmark/pfldd.onnx",
-    PATH_PREFIX + "face_recognition/model/feature/mask_mfn_v5_1_nobn.onnx",
-    PATH_PREFIX + "3rdparty/face_recognition/model/emotion/speaker_v5_island_v4_data3_sim.onnx",
+    kPathPrefix + "face_recognition/model/detect/mnetv2_gray_nop_light_epoch_235_512.onnx",
+    kPathPrefix + "face_recognition/model/landmark/pfldd.onnx",
+    kPathPrefix + "face_recognition/model/feature/mask_mfn_v5_1_nobn.onnx",
+    kPathPrefix + "3rdparty/face_recognition/model/emotion/speaker_v5_island_v4_data3_sim.onnx",
     true);
   std::cout << "Init complate. " << std::endl;
   for (size_t i = 0; i < file_names.size(); i++) {
@@ -104,11 +104,11 @@ int test_gesture(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_gesture===" << std::endl;
   BodyDetection body_ = BodyDetection(
-    PATH_PREFIX + "body_gesture/model/detect.onnx",
-    PATH_PREFIX + "body_gesture/model/cls_human_mid.onnx");
+    kPathPrefix + "body_gesture/model/detect.onnx",
+    kPathPrefix + "body_gesture/model/cls_human_mid.onnx");
   GestureRecognition gesture_ = GestureRecognition(
-    PATH_PREFIX + "body_gesture/model/hand_detect_1118_FP16.plan",
-    PATH_PREFIX + "body_gesture/model/hand_gesture_recognition_FP16.plan");
+    kPathPrefix + "body_gesture/model/hand_detect_1118_FP16.plan",
+    kPathPrefix + "body_gesture/model/hand_gesture_recognition_FP16.plan");
 
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
@@ -140,10 +140,10 @@ int test_keypoints(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_keypoints===" << std::endl;
   BodyDetection body_ = BodyDetection(
-    PATH_PREFIX + "body_gesture/model/detect.onnx",
-    PATH_PREFIX + "body_gesture/model/cls_human_mid.onnx");
+    kPathPrefix + "body_gesture/model/detect.onnx",
+    kPathPrefix + "body_gesture/model/cls_human_mid.onnx");
   KeypointsDetection keypoints_ = KeypointsDetection(
-    PATH_PREFIX + "keypoints_detection/model/human_keyoint_256x192x17.plan");
+    kPathPrefix + "keypoints_detection/model/human_keyoint_256x192x17.plan");
   std::cout << "Init complate. " << std::endl;
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
@@ -176,7 +176,7 @@ int test_reid(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_reid===" << std::endl;
   PersonReID reid_ = PersonReID(
-    PATH_PREFIX + "person_reid/model/reid_v1_mid.engine");
+    kPathPrefix + "person_reid/model/reid_v1_mid.engine");
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << i << " name: " << file_names[i] << std::endl;

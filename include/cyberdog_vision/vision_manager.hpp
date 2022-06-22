@@ -73,7 +73,7 @@ private:
   int sem_set_id_;
   char * shm_addr_;
 
-  size_t buff_size_;
+  size_t buf_size_;
   bool is_tracking_;
 
 };
