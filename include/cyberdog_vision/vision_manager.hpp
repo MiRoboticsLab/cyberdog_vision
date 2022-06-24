@@ -21,6 +21,7 @@
 #include "protocol/msg/body.hpp"
 #include "protocol/msg/body_info.hpp"
 #include "protocol/srv/body_region.hpp"
+#include "protocol/srv/camera_service.hpp"
 
 #include "cyberdog_vision/shared_memory_op.hpp"
 #include "cyberdog_vision/body_detection.hpp"
@@ -35,6 +36,7 @@ namespace cyberdog_vision
 using BodyInfoT = protocol::msg::Body;
 using BodyFrameInfoT = protocol::msg::BodyInfo;
 using BodyRegionT = protocol::srv::BodyRegion;
+using CameraServiceT = protocol::srv::CameraService;
 
 class VisionManager : public rclcpp::Node
 {
@@ -44,6 +46,7 @@ public:
 
 private:
   int Init();
+  void CreateObject();
   void ImageProc();
   void BodyDet();
   void ReIDProc();
@@ -55,10 +58,14 @@ private:
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<BodyRegionT::Request> req,
     std::shared_ptr<BodyRegionT::Response> res);
+  bool CallService(
+    rclcpp::Client<CameraServiceT>::SharedPtr & client, const uint8_t & cmd,
+    const std::string & args);
 
 private:
   rclcpp::Service<BodyRegionT>::SharedPtr tracking_service_;
   rclcpp::Publisher<BodyFrameInfoT>::SharedPtr body_pub_;
+  rclcpp::Client<CameraServiceT>::SharedPtr camera_clinet_;
 
   std::shared_ptr<std::thread> img_proc_thread_;
   std::shared_ptr<std::thread> body_det_thread_;

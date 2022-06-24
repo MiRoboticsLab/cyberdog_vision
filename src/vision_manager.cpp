@@ -31,11 +31,20 @@ VisionManager::VisionManager()
     throw std::logic_error("Init shared memory or semaphore fail. ");
   }
 
+  // Create object
+  CreateObject();
+  if (!CallService(camera_clinet_, 0, "face-interval=1")) {
+    throw std::logic_error("Start camera stream fail. ");
+  }
+
   // Create process thread
   img_proc_thread_ = std::make_shared<std::thread>(&VisionManager::ImageProc, this);
   body_det_thread_ = std::make_shared<std::thread>(&VisionManager::BodyDet, this);
   reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
+}
 
+void VisionManager::CreateObject()
+{
   // Create AI object
   body_ptr_ = std::make_shared<BodyDetection>(
     kModelPath + "body_gesture/model/detect.onnx",
@@ -43,11 +52,14 @@ VisionManager::VisionManager()
 
   reid_ptr_ = std::make_shared<PersonReID>(kModelPath + "person_reid/model/reid_v1_mid.engine");
 
-  // Create service
+  // Create service server
   tracking_service_ = create_service<BodyRegionT>(
     "tracking_object", std::bind(
       &VisionManager::TrackingService, this,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
+  // Create service client
+  camera_clinet_ = create_client<CameraServiceT>("camera_service");
 
   // Create publisher
   rclcpp::SensorDataQoS pub_qos;
@@ -134,7 +146,7 @@ void VisionManager::BodyDet()
       //     img_show, cv::Rect(res.left, res.top, res.width, res.height),
       //     cv::Scalar(0, 0, 255));
       // }
-      // cv::imshow("img", img_show);
+      // cv::imshow("vision", img_show);
       // cv::waitKey(10);
 
       body_results_.body_infos.push_back(infos);
@@ -230,7 +242,6 @@ void VisionManager::PublishResult(
 {
   BodyFrameInfoT pub_infos;
   pub_infos.header = body_results.detection_img.header;
-    pub_infos.header.stamp.nanosec << std::endl;
   BodyFrameInfo curr_frame = body_results.body_infos.back();
   pub_infos.count = curr_frame.size();
   for (size_t i = 0; i < pub_infos.count; ++i) {
@@ -261,6 +272,41 @@ void VisionManager::TrackingService(
   } else {
     res->success = true;
   }
+}
+
+bool VisionManager::CallService(
+  rclcpp::Client<CameraServiceT>::SharedPtr & client,
+  const uint8_t & cmd, const std::string & args)
+{
+  auto req = std::make_shared<CameraServiceT::Request>();
+  req->command = cmd;
+  req->args = args;
+
+  std::chrono::nanoseconds timeout = std::chrono::nanoseconds(-1);
+  while (!client->wait_for_service(timeout)) {
+    if (!rclcpp::ok()) {
+      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service. Exiting.");
+      return false;
+    }
+    RCLCPP_INFO(this->get_logger(), "Service not available, waiting again...");
+  }
+
+  auto client_cb = [timeout](rclcpp::Client<CameraServiceT>::SharedFuture future) {
+      std::future_status status = future.wait_for(timeout);
+
+      if (status == std::future_status::ready) {
+        if (0 != future.get()->result) {
+          return false;
+        } else {
+          return true;
+        }
+      } else {
+        return false;
+      }
+    };
+
+  auto result = client->async_send_request(req, client_cb);
+  return true;
 }
 
 VisionManager::~VisionManager()
