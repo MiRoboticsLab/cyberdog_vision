@@ -12,6 +12,7 @@ set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-10.2/)
 set(THIRD_PARTY_DIR ${CMAKE_SOURCE_DIR})
 set(THIRD_PARTY_URL https://cnbj2m-fds.api.xiaomi.net/bsp-internal/ROS/carpo-camera/AI/3rdparty.zip)
 execute_process(
+  COMMAND rm -rf ${CMAKE_SOURCE_DIR}/3rdparty
   COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/3rdparty
   COMMAND wget -q ${THIRD_PARTY_URL} -P ${CMAKE_SOURCE_DIR}/3rdparty
 )
