@@ -59,6 +59,7 @@ add_executable(vision_manager
   src/gesture_recognition.cpp
   src/keypoints_detection.cpp
   src/person_reid.cpp
+  src/face_manager.cpp
 )
 
 add_executable(test_ai

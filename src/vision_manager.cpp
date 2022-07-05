@@ -52,10 +52,23 @@ void VisionManager::CreateObject()
 
   reid_ptr_ = std::make_shared<PersonReID>(kModelPath + "person_reid/model/reid_v1_mid.engine");
 
+  face_ptr_ = std::make_shared<FaceRecognition>(kModelPath + "face_recognition/model/detect/mnetv2_gray_nop_light_epoch_235_512.onnx",
+                                                kModelPath + "face_recognition/model/landmark/pfldd.onnx",
+                                                kModelPath + "face_recognition/model/feature/mask_mfn_v5_1_nobn.onnx",
+                                                kModelPath + "face_recognition/model/emotion/speaker_v5_island_v4_data3_sim.onnx",
+                                                true);
+
+
   // Create service server
   tracking_service_ = create_service<BodyRegionT>(
     "tracking_object", std::bind(
       &VisionManager::TrackingService, this,
+      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
+  // Create face manager server
+  facemanager_service_ = create_service<FaceManagerT>(
+    "facemanager", std::bind(
+      &VisionManager::FaceManagerService, this,
       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
   // Create service client
@@ -65,6 +78,8 @@ void VisionManager::CreateObject()
   rclcpp::SensorDataQoS pub_qos;
   pub_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
   body_pub_ = create_publisher<BodyFrameInfoT>("body", pub_qos);
+
+  face_result_pub_ = create_publisher<FaceResultT>("/facemanager/face_result", pub_qos);
 }
 
 int VisionManager::Init()
@@ -181,6 +196,7 @@ void VisionManager::ReIDProc()
   }
 }
 
+
 double GetIOU(const HumanBodyInfo & b1, const sensor_msgs::msg::RegionOfInterest & b2)
 {
   int w =
@@ -199,6 +215,44 @@ double GetIOU(const HumanBodyInfo & b1, const sensor_msgs::msg::RegionOfInterest
   return w * h / static_cast<double>(b1.width * b1.height +
          b2.width * b2.height - w * h);
 }
+
+void split_string(
+  const std::string & s,
+  std::vector<std::string> & v, const std::string & sp)
+{
+  std::string::size_type pos1, pos2;
+  pos2 = s.find(sp);
+  pos1 = 0;
+
+  while (std::string::npos != pos2) {
+    v.push_back(s.substr(pos1, pos2));
+    pos1 = pos2 + sp.size();
+    pos2 = s.find(sp, pos1);
+  }
+  if (pos1 != s.length()) {
+    v.push_back(s.substr(pos1));
+  }
+}
+
+
+std::map<std::string, std::string> parse_parameters(std::string & params)
+{
+  std::vector<std::string> key_values;
+  std::map<std::string, std::string> params_map;
+
+  split_string(params, key_values, ";");
+  for (size_t i = 0; i < key_values.size(); i++) {
+    size_t pos = key_values[i].find("=");
+    if (std::string::npos != pos) {
+      std::string key = key_values[i].substr(0, pos);
+      std::string value = key_values[i].substr(pos + 1);
+      params_map[key] = value;
+    }
+  }
+
+  return params_map;
+}
+
 
 int VisionManager::GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi)
 {
@@ -272,6 +326,264 @@ void VisionManager::TrackingService(
   } else {
     res->success = true;
   }
+}
+
+void VisionManager::FaceManagerService(
+  const std::shared_ptr<rmw_request_id_t>,
+  const std::shared_ptr<FaceManagerT::Request> request,
+  std::shared_ptr<FaceManagerT::Response> response)
+{
+  RCLCPP_ERROR(
+    this->get_logger(),"face service received command %d, argument '%s'",
+    request->command, request->args.c_str());
+
+  switch (request->command) {
+    case FaceManagerT::Request::ADD_FACE:
+      response->result = addFaceInfo(request->args);
+      break;
+    case FaceManagerT::Request::CANCLE_ADD_FACE:
+      response->result = cancelAddFace();
+      break;
+    case FaceManagerT::Request::CONFIRM_LAST_FACE:
+      response->result = confirmFace(request->args);
+      break;
+    case FaceManagerT::Request::UPDATE_FACE_ID:
+      response->result = updateFaceId(request->args);
+      break;
+    case FaceManagerT::Request::DELETE_FACE:
+      response->result = deleteFace(request->args);
+      break;
+    case FaceManagerT::Request::GET_ALL_FACES:
+      response->result = getAllFaces(response);
+      //response->result = startFaceMatch();
+      break;
+    default:
+      RCLCPP_ERROR(this->get_logger(),"service unsupport command %d", request->command);
+      response->result = FaceManagerT::Response::RESULT_INVALID_ARGS;
+  }
+}
+
+
+void VisionManager::publishFaceResult(int result, const std::string & name, cv::Mat &img)
+{
+  auto face_result_msg = std::make_unique<FaceResultT>();
+
+  size_t png_size;
+  unsigned char *png_data;
+
+  std::vector<unsigned char> png_buff;
+  std::vector<int> png_param= std::vector<int>(2);
+  png_param[0]= 16; //CV_IMWRITE_PNG_QUALITY;
+  png_param[1]= 3;  //default(95)
+
+  imencode(".png",img, png_buff,png_param);
+  png_size = png_buff.size();
+  png_data = (unsigned char *)malloc(png_size);
+  for(size_t i = 0;i < png_size;i++)
+    png_data[i] = png_buff[i];
+
+#if 0
+  /*save to png file*/
+  std::string filename;
+  FILE * fp;
+  filename = "/home/mi/.faces/test.png";
+  fp = fopen(filename.c_str(), "wb+");
+  size_t remain = size;
+  int writeptr = 0;
+  int count = 0;
+  while(remain > 0)
+  {
+    count = fwrite(mat_data + writeptr, 1,remain, fp);
+	writeptr += count;
+	remain -= count;
+  }
+  fclose(fp);
+#endif
+
+  face_result_msg->result = result;
+  face_result_msg->msg = name;
+  face_result_msg->face_images.resize(1);
+  face_result_msg->face_images[0].header.frame_id = name;
+  face_result_msg->face_images[0].format = "png";
+  face_result_msg->face_images[0].data.resize(png_size);
+  //std::copy(buff.begin(),buff.end(),&(msg->face_images[0].data[0]));
+  memcpy(&(face_result_msg->face_images[0].data[0]), png_data, png_size);
+  face_result_pub_->publish(std::move(face_result_msg));
+
+  free(png_data);
+}
+
+
+void VisionManager::FaceDetProc(std::string face_name)
+{
+  std::map<std::string, std::vector<float>> endlib_feats;
+  std::vector<MatchFaceInfo> match_info;
+  endlib_feats = FaceManager::getInstance()->getFeatures();
+
+  while (true) {
+    std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
+    global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
+    global_img_buf_.is_filled = false;
+
+    std::vector<EntryFaceInfo> faces_info;
+    cv::Mat mat_tmp = global_img_buf_.img_buf[0].img.clone();
+
+    face_ptr_->GetFaceInfo(mat_tmp,faces_info);
+
+    if(FaceManager::getInstance()->checkFacePose(faces_info))
+    {
+        /*check if face feature already in endlib_feats*/
+        face_ptr_->GetRecognitionResult(mat_tmp,endlib_feats,match_info);
+        //printf("match_info:match_score:%f\n",match_info[0].match_score);
+        if(match_info.size() > 0 && match_info[0].match_score > 0.9)
+        {
+            publishFaceResult(-1,match_info[0].face_id,mat_tmp);
+            RCLCPP_ERROR(this->get_logger(),"%s already in endlib\n",match_info[0].face_id.c_str());
+            continue;
+        }
+        /**/
+        FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
+        publishFaceResult(0,face_name,mat_tmp);
+            break;
+    }
+
+  }
+
+}
+
+
+int VisionManager::startFaceMatch()
+{
+  std::vector<MatchFaceInfo> match_info;
+  std::map<std::string, std::vector<float>> endlib_feats;
+
+  endlib_feats = FaceManager::getInstance()->getFeatures();
+
+  while (1)
+  {
+    std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
+    global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
+    global_img_buf_.is_filled = false;
+
+    cv::Mat mat_tmp = global_img_buf_.img_buf[0].img.clone();
+    face_ptr_->GetRecognitionResult(mat_tmp,endlib_feats,match_info);
+    if(match_info.size() > 0 && match_info[0].match_score > 0.9 )
+    {
+        RCLCPP_INFO(this->get_logger(),"match info name:%s\n",match_info[0].face_id.c_str());
+        break;
+    }
+
+  }
+  return 0;
+
+}
+
+int VisionManager::addFaceInfo(std::string & args)
+{
+  std::string name;
+  bool is_host = false;
+
+  // parse command arguments
+  std::map<std::string, std::string> params_map = parse_parameters(args);
+  std::map<std::string, std::string>::iterator it;
+  for (it = params_map.begin(); it != params_map.end(); it++) {
+    if (it->first == "id") {
+      name = it->second;
+    }
+    if (it->first == "host" && it->second == "true") {
+      is_host = true;
+    }
+  }
+
+  RCLCPP_INFO(this->get_logger(),"add face info id:%s host:%d", name.c_str(),is_host);
+
+  if (name.length() == 0) {
+    return -1;
+  }
+
+  FaceManager::getInstance()->addFaceIDCacheInfo(name,is_host);
+
+  std::thread faceDet = std::thread(&VisionManager::FaceDetProc,this,name);
+  faceDet.detach();
+
+  return 0;
+}
+
+
+int VisionManager::cancelAddFace()
+{
+   return FaceManager::getInstance()->cancelAddFace();
+}
+
+int VisionManager::confirmFace(std::string & args)
+{
+  std::string name;
+  bool is_host = false;
+
+  // parse command arguments
+  std::map<std::string, std::string> params_map = parse_parameters(args);
+  std::map<std::string, std::string>::iterator it;
+  for (it = params_map.begin(); it != params_map.end(); it++) {
+    if (it->first == "id") {
+      name = it->second;
+    }
+    if (it->first == "host" && it->second == "true") {
+      is_host = true;
+    }
+  }
+
+  RCLCPP_INFO(this->get_logger(),"id:%s host:%d", name.c_str(),is_host);
+
+  if (name.length() == 0) {
+    return -1;
+  }
+
+  return FaceManager::getInstance()->confirmFace(name,is_host);
+}
+
+int VisionManager::updateFaceId(std::string & args)
+{
+  std::vector<std::string> names;
+
+  split_string(args, names, ":");
+  if (names.size() != 2) {
+    return -1;
+  }
+
+  std::string ori_name = names[0];
+  std::string new_name = names[1];
+
+  return FaceManager::getInstance()->updateFaceId(ori_name,new_name);
+}
+
+int VisionManager::deleteFace(std::string & args)
+{
+  std::string face_name;
+  bool is_host = false;
+
+  // parse command arguments
+  std::map<std::string, std::string> params_map = parse_parameters(args);
+  std::map<std::string, std::string>::iterator it;
+  for (it = params_map.begin(); it != params_map.end(); it++) {
+        if (it->first == "id") {
+          face_name = it->second;
+        }
+        if (it->first == "host" && it->second == "true") {
+          is_host = true;
+        }
+  }
+
+  return FaceManager::getInstance()->deleteFace(face_name);
+}
+
+
+int VisionManager::getAllFaces(std::shared_ptr<FaceManagerT::Response> response)
+{
+  std::string all_face_info = FaceManager::getInstance()->getAllFaces();
+  response->msg = all_face_info;
+
+  RCLCPP_INFO(this->get_logger(), "all face info:%s\n",all_face_info.c_str());
+  return 0;
 }
 
 bool VisionManager::CallService(
