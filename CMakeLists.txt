@@ -37,6 +37,7 @@ find_package(XmFace REQUIRED)
 find_package(XmGesture REQUIRED)
 find_package(XmKeypoints REQUIRED)
 find_package(XmReID REQUIRED)
+find_package(XmTrack REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -70,8 +71,8 @@ add_executable(test_ai
   src/person_reid.cpp
 )
 
-ament_target_dependencies(vision_manager rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID)
-ament_target_dependencies(test_ai rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID)
+ament_target_dependencies(vision_manager rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID XmTrack)
+ament_target_dependencies(test_ai rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID XmTrack)
 
 install(TARGETS
   vision_manager

@@ -24,7 +24,7 @@
 #include "cyberdog_vision/keypoints_detection.hpp"
 #include "cyberdog_vision/person_reid.hpp"
 
-const std::string kPathPrefix = "/home/mi/ros2_app/src/cyberdog_vision/3rdparty/";
+const std::string kPathPrefix = "/home/mi/ros2_app/src/cyberdog_vision/3rdparty";
 
 using namespace cyberdog_vision;
 
@@ -32,8 +32,8 @@ int test_body(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_body===" << std::endl;
   BodyDetection body_ = BodyDetection(
-    kPathPrefix + "body_gesture/model/detect.onnx",
-    kPathPrefix + "body_gesture/model/cls_human_mid.onnx");
+    kPathPrefix + "/body_gesture/model/detect.onnx",
+    kPathPrefix + "/body_gesture/model/cls_human_mid.onnx");
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << file_names[i] << std::endl;
@@ -60,11 +60,7 @@ int test_face(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_face===" << std::endl;
   FaceRecognition face_ = FaceRecognition(
-    kPathPrefix + "face_recognition/model/detect/mnetv2_gray_nop_light_epoch_235_512.onnx",
-    kPathPrefix + "face_recognition/model/landmark/pfldd.onnx",
-    kPathPrefix + "face_recognition/model/feature/mask_mfn_v5_1_nobn.onnx",
-    kPathPrefix + "3rdparty/face_recognition/model/emotion/speaker_v5_island_v4_data3_sim.onnx",
-    true);
+    kPathPrefix + "/face_recognition", true, true);
   std::cout << "Init complate. " << std::endl;
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
@@ -104,11 +100,11 @@ int test_gesture(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_gesture===" << std::endl;
   BodyDetection body_ = BodyDetection(
-    kPathPrefix + "body_gesture/model/detect.onnx",
-    kPathPrefix + "body_gesture/model/cls_human_mid.onnx");
+    kPathPrefix + "/body_gesture/model/detect.onnx",
+    kPathPrefix + "/body_gesture/model/cls_human_mid.onnx");
   GestureRecognition gesture_ = GestureRecognition(
-    kPathPrefix + "body_gesture/model/hand_detect_1118_FP16.plan",
-    kPathPrefix + "body_gesture/model/hand_gesture_recognition_FP16.plan");
+    kPathPrefix + "/body_gesture/model/hand_detect_1118_FP16.plan",
+    kPathPrefix + "/body_gesture/model/hand_gesture_recognition_FP16.plan");
 
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
@@ -121,16 +117,13 @@ int test_gesture(const std::vector<cv::String> & file_names)
     }
     std::vector<InferBbox> infer_bboxes = BodyConvert(bodies);
     // Gesture recognition
-    for (int num = 0; num < 3; num++) {
-      int gesture_cls;
-      cv::Rect gesture_rect;
-      if (0 == gesture_.GetGestureInfo(img, infer_bboxes, gesture_cls, gesture_rect)) {
-        std::cout << "class: " << gesture_cls << std::endl;
-        std::cout << "rect: " << gesture_rect.x << "," <<
-          gesture_rect.y << "," <<
-          gesture_rect.x + gesture_rect.width << "," <<
-          gesture_rect.y + gesture_rect.height << "," << std::endl;
-      }
+    std::vector<GestureInfo> infos;
+    gesture_.GetGestureInfo(img, infer_bboxes, infos);
+    std::cout << "Person num: " << infos.size() << std::endl;
+    for (size_t i = 0; i < infos.size(); ++i) {
+      std::cout << "Person " << i << ": label - rect" << std::endl;
+      std::cout << infos[i].label << std::endl;
+      std::cout << infos[i].rect << std::endl;
     }
   }
   return 0;
@@ -140,10 +133,10 @@ int test_keypoints(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_keypoints===" << std::endl;
   BodyDetection body_ = BodyDetection(
-    kPathPrefix + "body_gesture/model/detect.onnx",
-    kPathPrefix + "body_gesture/model/cls_human_mid.onnx");
+    kPathPrefix + "/body_gesture/model/detect.onnx",
+    kPathPrefix + "/body_gesture/model/cls_human_mid.onnx");
   KeypointsDetection keypoints_ = KeypointsDetection(
-    kPathPrefix + "keypoints_detection/model/human_keyoint_256x192x17.plan");
+    kPathPrefix + "/keypoints_detection/model/human_keyoint_256x192x17.plan");
   std::cout << "Init complate. " << std::endl;
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
@@ -176,7 +169,7 @@ int test_reid(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_reid===" << std::endl;
   PersonReID reid_ = PersonReID(
-    kPathPrefix + "person_reid/model/reid_v1_mid.engine");
+    kPathPrefix + "/person_reid/model/reid_v1_mid.engine");
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << i << " name: " << file_names[i] << std::endl;

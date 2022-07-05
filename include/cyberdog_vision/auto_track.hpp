@@ -12,35 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CYBERDOG_VISION__FACE_RECOGNITION_HPP_
-#define CYBERDOG_VISION__FACE_RECOGNITION_HPP_
+#ifndef CYBERDOG_VISION__AUTO_TRACK_HPP_
+#define CYBERDOG_VISION__AUTO_TRACK_HPP_
 
-#include <memory>
-
-#include "XMFaceAPI.h"
-#include "common_type.hpp"
+#include "tracker.hpp"
 
 namespace cyberdog_vision
 {
 
-class FaceRecognition
+class AutoTrack
 {
 public:
-  FaceRecognition(
-    const std::string & model_path, bool open_emotion, bool open_age);
-  ~FaceRecognition();
+  AutoTrack(const std::string & model_path);
+  ~AutoTrack();
 
-  int GetFaceInfo(const cv::Mat & img, std::vector<EntryFaceInfo> & faces_info);
-  int GetRecognitionResult(
-    const cv::Mat & img, const std::map<std::string, std::vector<float>> & endlib_feats,
-    std::vector<MatchFaceInfo> & faces_info);
+  int SetTracker(const cv::Mat & img, const cv::Rect & bbox);
+  bool Track(const cv::Mat & img, cv::Rect & bbox);
+  void SetLossTh(int loss_th);
 
 private:
-  void FillParam(const std::string & model_path, FaceParam & param);
-  XMFaceAPI * face_ptr_;
-
+  std::shared_ptr<TRACKER::Tracker> tracker_ptr_;
+  int gpu_id_;
+  int loss_th_;
+  int fail_count_;
 };
 
 }  // namespace cyberdog_vision
 
-#endif  // CYBERDOG_VISION__FACE_RECOGNITION_HPP_
+#endif  // CYBERDOG_VISION__AUTO_TRACK_HPP_

@@ -18,18 +18,14 @@ namespace cyberdog_vision
 {
 
 FaceRecognition::FaceRecognition(
-  const std::string & model_det, const std::string & model_lmk,
-  const std::string & model_feat, const std::string & model_emotion,
-  bool open_emotion)
+  const std::string & model_path, bool open_emotion, bool open_age)
 {
   face_ptr_ = XMFaceAPI::Create();
 
   FaceParam param;
-  param.detect_mf = model_det;
-  param.lmk_mf = model_lmk;
-  param.feat_mf = model_feat;
-  param.emotion_mf = model_emotion;
+  FillParam(model_path, param);
   param.open_emotion = open_emotion;
+  param.open_age = open_age;
   param.det_scale = 512;
   param.feat_thres = 0.65;
   if (!face_ptr_->init(param)) {
@@ -63,6 +59,15 @@ int FaceRecognition::GetRecognitionResult(
     return -1;
   }
   return 0;
+}
+
+void FaceRecognition::FillParam(const std::string & model_path, FaceParam & param)
+{
+  param.detect_mf = model_path + "/model/detect/mnetv2_gray_nop_light_epoch_235_512.onnx";
+  param.lmk_mf = model_path + "/model/landmark/pfldd.onnx";
+  param.feat_mf = model_path + "/model/feature/mask_mfn_v5_1_nobn.onnx";
+  param.emotion_mf = model_path + "/model/emotion/speaker_v5_island_v4_data3_sim.onnx";
+  param.age_mf = model_path + "/model/age/tinyage_gray_112_age_gender_sim.onnx";
 }
 
 FaceRecognition::~FaceRecognition()

@@ -19,7 +19,7 @@ namespace cyberdog_vision
 {
 
 PersonReID::PersonReID(const std::string & model_reid)
-: gpu_id_(0), tracking_id_(0), object_loss_th_(1000), library_frame_num_(15), unmatch_count_(0),
+: gpu_id_(0), tracking_id_(0), object_loss_th_(300), library_frame_num_(15), unmatch_count_(0),
   feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), reid_ptr_(nullptr)
 {
   if (0 != REID_Init(reid_ptr_, model_reid.c_str(), gpu_id_)) {

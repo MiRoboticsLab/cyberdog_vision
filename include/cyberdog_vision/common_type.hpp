@@ -38,6 +38,12 @@ struct InferBbox
   float score;
 };
 
+struct GestureInfo
+{
+  cv::Rect rect;
+  int label;
+};
+
 struct StampedImage
 {
   std_msgs::msg::Header header;

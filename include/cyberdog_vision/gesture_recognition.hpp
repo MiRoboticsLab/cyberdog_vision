@@ -15,7 +15,7 @@
 #ifndef CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
 #define CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
 
-#include "person_detect_hand_gesture.h"
+#include "hand_gesture.h"
 #include "common_type.hpp"
 
 namespace cyberdog_vision
@@ -27,12 +27,15 @@ public:
   GestureRecognition(const std::string & model_det, const std::string & model_cls);
   ~GestureRecognition();
 
-  int GetGestureInfo(
+  void GetGestureInfo(
     const cv::Mat & img, const std::vector<InferBbox> & body_boxes,
-    int & gesture_cls, cv::Rect & gesture_box);
+    std::vector<GestureInfo> & infos);
+
+  void SetRecognitionNum(int num);
 
 private:
-  std::shared_ptr<Hand_Gesture_Classification_Node> gesture_ptr_;
+  std::shared_ptr<handgesture::Hand_Gesture> gesture_ptr_;
+  int max_person_num_;
 };
 
 }  // namespace cyberdog_vision
