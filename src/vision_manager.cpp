@@ -52,12 +52,7 @@ void VisionManager::CreateObject()
 
   reid_ptr_ = std::make_shared<PersonReID>(kModelPath + "person_reid/model/reid_v1_mid.engine");
 
-  face_ptr_ = std::make_shared<FaceRecognition>(kModelPath + "face_recognition/model/detect/mnetv2_gray_nop_light_epoch_235_512.onnx",
-                                                kModelPath + "face_recognition/model/landmark/pfldd.onnx",
-                                                kModelPath + "face_recognition/model/feature/mask_mfn_v5_1_nobn.onnx",
-                                                kModelPath + "face_recognition/model/emotion/speaker_v5_island_v4_data3_sim.onnx",
-                                                true);
-
+  face_ptr_ = std::make_shared<FaceRecognition>(kModelPath + "face_recognition",true,true);
 
   // Create service server
   tracking_service_ = create_service<BodyRegionT>(
@@ -559,7 +554,7 @@ int VisionManager::updateFaceId(std::string & args)
 int VisionManager::deleteFace(std::string & args)
 {
   std::string face_name;
-  bool is_host = false;
+  //bool is_host = false;
 
   // parse command arguments
   std::map<std::string, std::string> params_map = parse_parameters(args);
@@ -569,7 +564,7 @@ int VisionManager::deleteFace(std::string & args)
           face_name = it->second;
         }
         if (it->first == "host" && it->second == "true") {
-          is_host = true;
+          //is_host = true;
         }
   }
 
