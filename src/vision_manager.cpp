@@ -362,7 +362,7 @@ void VisionManager::FaceManagerService(
 void VisionManager::publishFaceResult(int result, const std::string & name, cv::Mat &img)
 {
   auto face_result_msg = std::make_unique<FaceResultT>();
-
+  printf("publishFaceResult:%d %s\n",result,name.c_str());
   size_t png_size;
   unsigned char *png_data;
 
@@ -413,15 +413,17 @@ void VisionManager::FaceDetProc(std::string face_name)
 {
   std::map<std::string, std::vector<float>> endlib_feats;
   std::vector<MatchFaceInfo> match_info;
+  cv::Mat mat_tmp;
+  bool get_face_success = false;
   endlib_feats = FaceManager::getInstance()->getFeatures();
-
-  while (true) {
+  std::time_t cur_time = std::time(NULL);
+  while (std::difftime(std::time(NULL),cur_time) < 10) {
     std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
     global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
     global_img_buf_.is_filled = false;
 
     std::vector<EntryFaceInfo> faces_info;
-    cv::Mat mat_tmp = global_img_buf_.img_buf[0].img.clone();
+    mat_tmp = global_img_buf_.img_buf[0].img.clone();
 
     face_ptr_->GetFaceInfo(mat_tmp,faces_info);
 
@@ -434,16 +436,20 @@ void VisionManager::FaceDetProc(std::string face_name)
         {
             publishFaceResult(-1,match_info[0].face_id,mat_tmp);
             RCLCPP_ERROR(this->get_logger(),"%s already in endlib\n",match_info[0].face_id.c_str());
-            continue;
-        }
-        /**/
-        FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
-        publishFaceResult(0,face_name,mat_tmp);
+            get_face_success = true;
             break;
+        }
+        /*get face info sucess*/
+		FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
+        publishFaceResult(0,face_name,mat_tmp);
+        get_face_success = true;
+        break;
     }
 
   }
-
+  /*it time out publish error*/
+  if(!get_face_success)
+    publishFaceResult(-1,"timeout",mat_tmp);
 }
 
 
