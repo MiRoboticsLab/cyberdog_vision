@@ -125,7 +125,7 @@ int FaceManager::addFaceFeatureCacheInfo(std::vector<EntryFaceInfo> & faceinfo)
 
 
 int FaceManager::cancelAddFace()
-{   
+{
   m_faceFeatsCached.clear();
   m_faceIdCached.name = "";
   m_faceIdCached.is_host = false;
@@ -136,25 +136,34 @@ int FaceManager::confirmFace(std::string &name,bool is_host)
 {
   std::string filename;
   FILE * fp;
-  
-  std::cout << "confirm last face name: " << m_faceIdCached.name << m_faceIdCached.is_host << std::endl;
+
+  std::cout << "confirm last face name: " << m_faceIdCached.name << " is_host: " << m_faceIdCached.is_host << std::endl;
   if(m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host)
   {
       std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name << std::endl;
       return -1;
   }
-  
+  if(m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host)
+  {
+      std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name << std::endl;
+      return -1;
+  }
+  if(m_faceFeatsCached.empty())
+  {
+      std::cout << "Error:faceFeatsCached empty..." << std::endl;
+      return -1;
+  }
   m_mutex.lock();
   m_features[m_faceIdCached.name] = m_faceFeatsCached;
   m_hostMap[m_faceIdCached.name] = m_faceIdCached.is_host;
   m_mutex.unlock();
-  
+
   /* save face features */
   if (access(label_path, 0) != 0) {
   umask(0);
   mkdir(label_path, 0755);
   }
-  
+
   /*
    * face data layout
    * 1. features size   - unsigned long
@@ -171,7 +180,7 @@ int FaceManager::confirmFace(std::string &name,bool is_host)
   fwrite(&m_faceIdCached.is_host, sizeof(m_faceIdCached.is_host), 1, fp);
   fclose(fp);
   delete[] feats_array;
-  
+
   /* clear face cache */
   m_faceFeatsCached.clear();
   m_faceIdCached.name = "";
@@ -182,7 +191,7 @@ int FaceManager::confirmFace(std::string &name,bool is_host)
 }
 
 int FaceManager::updateFaceId(std::string & ori_name, std::string & new_name)
-{  
+{
   if (m_features.find(ori_name) == m_features.end()) {
     std::cout << "Face name not fount " << ori_name << std::endl;
     return -1;
@@ -194,7 +203,7 @@ int FaceManager::updateFaceId(std::string & ori_name, std::string & new_name)
   m_hostMap[new_name] = m_hostMap[ori_name];
   m_hostMap.erase(ori_name);
   m_mutex.unlock();
-  
+
   std::string ori_filename = std::string(label_path) + ori_name + ".data";
   std::string new_filename = std::string(label_path) + new_name + ".data";
   if (access(ori_filename.c_str(), 0) != 0) {
@@ -244,13 +253,13 @@ std::string FaceManager::getAllFaces()
   std::vector<std::string> filenames;
   std::string res;
   std::string all_face_info;
-  
+
   std::string path = getFaceDataPath();
   if (access(path.c_str(), 0) != 0) {
     return "NULL";
   }
   cv::glob(path + "*.data", filenames);
-  
+
   for (unsigned int i = 0; i < filenames.size(); i++)
   {
     int face_name_len = filenames[i].find_last_of(".") - filenames[i].find_last_of("/") - 1;
@@ -261,9 +270,9 @@ std::string FaceManager::getAllFaces()
     }
     if(i != 0)
       all_face_info += ";";
-    
-    all_face_info = all_face_info + "id=" + face_name + ",host=" + is_host;   
-  
+
+    all_face_info = all_face_info + "id=" + face_name + ",host=" + is_host;
+
   }
   return all_face_info;
 }
@@ -278,7 +287,7 @@ bool FaceManager::isHost(const std::string & face_name)
 {
   if (m_hostMap.find(face_name) != m_hostMap.end()) {
     return m_hostMap[face_name];
-  }   
+  }
 
   return false;
 }
