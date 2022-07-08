@@ -10,17 +10,17 @@ set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-10.2/)
 
 # third_party_library
 set(THIRD_PARTY_DIR ${CMAKE_SOURCE_DIR})
-set(THIRD_PARTY_URL https://cnbj2m-fds.api.xiaomi.net/bsp-internal/ROS/carpo-camera/AI/3rdparty.zip)
+set(THIRD_PARTY_URL https://cnbj2m-fds.api.xiaomi.net/bsp-internal/ROS/carpo-camera/AI/3rdparty.tar)
 execute_process(
   COMMAND rm -rf ${CMAKE_SOURCE_DIR}/3rdparty
   COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/3rdparty
   COMMAND wget -q ${THIRD_PARTY_URL} -P ${CMAKE_SOURCE_DIR}/3rdparty
 )
 execute_process(
-  COMMAND unzip ${CMAKE_SOURCE_DIR}/3rdparty/3rdparty.zip
+  COMMAND tar xvf ${CMAKE_SOURCE_DIR}/3rdparty/3rdparty.tar
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/3rdparty
 )
-execute_process(COMMAND rm ${CMAKE_SOURCE_DIR}/3rdparty/3rdparty.zip)
+execute_process(COMMAND rm ${CMAKE_SOURCE_DIR}/3rdparty/3rdparty.tar)
 add_subdirectory(3rdparty)
 
 # find dependencies
