@@ -75,6 +75,28 @@ struct BodyResults
   }
 };
 
+struct AlgoStruct
+{
+  bool is_called;
+  std::mutex mtx;
+  std::condition_variable cond;
+  AlgoStruct()
+  {
+    is_called = false;
+  }
+};
+
+struct AlgoProcess
+{
+  int process_num;
+  std::mutex mtx;
+  std::condition_variable cond;
+  AlgoProcess()
+  {
+    process_num = 0;
+  }
+};
+
 inline void ImgConvert(const cv::Mat & img, XMImage & xm_img)
 {
   xm_img.data = img.data;

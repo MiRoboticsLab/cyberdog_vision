@@ -33,11 +33,11 @@ public:
   static FaceManager * getInstance();
   static const std::string getFaceDataPath();
   std::map<std::string, std::vector<float>> & getFeatures();
-  int addFaceIDCacheInfo(std::string & name,bool is_host);
+  int addFaceIDCacheInfo(std::string & name, bool is_host);
   int addFaceFeatureCacheInfo(std::vector<EntryFaceInfo> & faceinfo);
   int cancelAddFace();
-  bool checkFacePose(std::vector<EntryFaceInfo> &faceinfo);
-  int confirmFace(std::string & name,bool is_host);
+  bool checkFacePose(std::vector<EntryFaceInfo> & faceinfo);
+  int confirmFace(std::string & name, bool is_host);
   int updateFaceId(std::string & ori_name, std::string & new_name);
   int deleteFace(std::string & face_name);
   std::string getAllFaces();
@@ -64,4 +64,3 @@ private:
 }  // namespace cyberdog_vision
 
 #endif  // CYBERDOG_VISION__FACE_MANAGER_HPP_
-

@@ -53,8 +53,8 @@ const std::string FaceManager::getFaceDataPath()
 void FaceManager::initialize()
 {
   if (!loadFeatures()) {
-      std::cout << "Failed to load face features." << std::endl;
-    }
+    std::cout << "Failed to load face features." << std::endl;
+  }
 }
 
 std::map<std::string, std::vector<float>> & FaceManager::getFeatures()
@@ -102,14 +102,14 @@ bool FaceManager::loadFeatures()
   return true;
 }
 
-bool FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfo)
+bool FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfo)
 {
   std::cout << "faceinfo.size: " << faceinfo.size() << std::endl;
-  if(faceinfo.size() == 1) return true;
+  if (faceinfo.size() == 1) {return true;}
   return false;
 }
 
-int FaceManager::addFaceIDCacheInfo(std::string & name,bool is_host)
+int FaceManager::addFaceIDCacheInfo(std::string & name, bool is_host)
 {
   m_faceIdCached.is_host = is_host;
   m_faceIdCached.name = name;
@@ -132,26 +132,26 @@ int FaceManager::cancelAddFace()
   return 0;
 }
 
-int FaceManager::confirmFace(std::string &name,bool is_host)
+int FaceManager::confirmFace(std::string & name, bool is_host)
 {
   std::string filename;
   FILE * fp;
 
-  std::cout << "confirm last face name: " << m_faceIdCached.name << " is_host: " << m_faceIdCached.is_host << std::endl;
-  if(m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host)
-  {
-      std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name << std::endl;
-      return -1;
+  std::cout << "confirm last face name: " << m_faceIdCached.name << " is_host: " <<
+    m_faceIdCached.is_host << std::endl;
+  if (m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host) {
+    std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name <<
+      std::endl;
+    return -1;
   }
-  if(m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host)
-  {
-      std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name << std::endl;
-      return -1;
+  if (m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host) {
+    std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name <<
+      std::endl;
+    return -1;
   }
-  if(m_faceFeatsCached.empty())
-  {
-      std::cout << "Error:faceFeatsCached empty..." << std::endl;
-      return -1;
+  if (m_faceFeatsCached.empty()) {
+    std::cout << "Error:faceFeatsCached empty..." << std::endl;
+    return -1;
   }
   m_mutex.lock();
   m_features[m_faceIdCached.name] = m_faceFeatsCached;
@@ -160,8 +160,8 @@ int FaceManager::confirmFace(std::string &name,bool is_host)
 
   /* save face features */
   if (access(label_path, 0) != 0) {
-  umask(0);
-  mkdir(label_path, 0755);
+    umask(0);
+    mkdir(label_path, 0755);
   }
 
   /*
@@ -260,16 +260,16 @@ std::string FaceManager::getAllFaces()
   }
   cv::glob(path + "*.data", filenames);
 
-  for (unsigned int i = 0; i < filenames.size(); i++)
-  {
+  for (unsigned int i = 0; i < filenames.size(); i++) {
     int face_name_len = filenames[i].find_last_of(".") - filenames[i].find_last_of("/") - 1;
     std::string face_name = filenames[i].substr(filenames[i].find_last_of("/") + 1, face_name_len);
     std::string is_host = "FALSE";
     if (FaceManager::getInstance()->isHost(face_name)) {
       is_host = "TRUE";
     }
-    if(i != 0)
+    if (i != 0) {
       all_face_info += ";";
+    }
 
     all_face_info = all_face_info + "id=" + face_name + ",host=" + is_host;
 
