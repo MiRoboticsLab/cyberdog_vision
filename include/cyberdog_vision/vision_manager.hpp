@@ -73,7 +73,6 @@ private:
   void ReIDProc();
   void GestureRecognize();
   void KeypointsDet();
-  void PublishResult();
   void FaceDetProc(std::string);
 
   int LoadFaceLibrary(std::map<std::string, std::vector<float>> & library);
@@ -126,7 +125,6 @@ private:
   std::shared_ptr<std::thread> reid_thread_;
   std::shared_ptr<std::thread> gesture_thread_;
   std::shared_ptr<std::thread> keypoints_thread_;
-  std::shared_ptr<std::thread> publish_thread_;
 
   std::shared_ptr<BodyDetection> body_ptr_;
   std::shared_ptr<PersonReID> reid_ptr_;

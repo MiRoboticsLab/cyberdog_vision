@@ -48,7 +48,6 @@ VisionManager::VisionManager()
   reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
   gesture_thread_ = std::make_shared<std::thread>(&VisionManager::GestureRecognize, this);
   keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
-  publish_thread_ = std::make_shared<std::thread>(&VisionManager::PublishResult, this);
 
 }
 
@@ -92,7 +91,6 @@ void VisionManager::CreateObject()
     kModelPath + "/body_gesture/model/cls_human_mid.onnx");
 
   reid_ptr_ = std::make_shared<PersonReID>(kModelPath + "/person_reid/model/reid_v1_mid.engine");
-
   face_ptr_ = std::make_shared<FaceRecognition>(kModelPath + "/face_recognition", true, true);
 
   // Create service server
@@ -125,7 +123,6 @@ void VisionManager::CreateObject()
 void VisionManager::ImageProc()
 {
   while (rclcpp::ok()) {
-    // TODO: add timestamp
     WaitSem(sem_set_id_, 2);
     WaitSem(sem_set_id_, 0);
     StampedImage simg;
@@ -182,6 +179,16 @@ void VisionManager::MainAlgoManager()
       focus_struct_.cond.notify_one();
     }
   }
+
+  // Wait for result to pub
+  {
+    std::lock(algo_proc_.mtx, result_mtx_);
+    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
+    algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
+    std::cout << "===Process complate to pub. " << std::endl;
+    person_pub_->publish(algo_result_);
+  }
 }
 
 void VisionManager::DependAlgoManager()
@@ -218,6 +225,16 @@ void VisionManager::DependAlgoManager()
       algo_proc_.process_num++;
       keypoints_struct_.cond.notify_one();
     }
+  }
+
+  // Wait for result to pub
+  {
+    std::lock(algo_proc_.mtx, result_mtx_);
+    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
+    algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
+    std::cout << "===Process complate to pub. " << std::endl;
+    person_pub_->publish(algo_result_);
   }
 }
 
@@ -436,18 +453,6 @@ void VisionManager::KeypointsDet()
     if (0 == algo_proc_.process_num) {
       algo_proc_.cond.notify_one();
     }
-  }
-}
-
-void VisionManager::PublishResult()
-{
-  while (rclcpp::ok()) {
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
-    std::cout << "===Process complate to pub. " << std::endl;
-    person_pub_->publish(algo_result_);
   }
 }
 
