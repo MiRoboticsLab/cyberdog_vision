@@ -770,7 +770,7 @@ void VisionManager::FaceDetProc(std::string face_name)
   if(get_face_timeout)
   {
     checkFacePose_Msg = "timeout";
-    publishFaceResult(-1,face_name,mat_tmp,checkFacePose_Msg);
+    publishFaceResult(12,face_name,mat_tmp,checkFacePose_Msg);
   }
 }
 
