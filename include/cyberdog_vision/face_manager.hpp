@@ -27,6 +27,53 @@ struct FaceId
   bool is_host;
 };
 
+template<typename T, size_t COUNT>
+struct SizedVector
+{
+public:
+  SizedVector()
+  {
+    m_index = 0;
+  }
+
+  void push_back(const T & obj)
+  {
+    if (m_vector.size() >= COUNT) {
+      m_index %= COUNT;
+      m_vector[m_index] = obj;
+      m_index++;
+    } else {
+      m_vector.push_back(obj);
+    }
+  }
+
+  size_t size()
+  {
+    return m_vector.size();
+  }
+
+  std::vector<T> & vector()
+  {
+    return m_vector;
+  }
+
+  void clear()
+  {
+    m_vector.clear();
+    m_index = 0;
+  }
+
+  bool full()
+  {
+    return m_vector.size() == COUNT;
+  }
+
+private:
+  std::vector<T> m_vector;
+  size_t m_index;
+};
+
+
 class FaceManager
 {
 public:
@@ -36,9 +83,10 @@ public:
   int addFaceIDCacheInfo(std::string & name, bool is_host);
   int addFaceFeatureCacheInfo(std::vector<EntryFaceInfo> & faceinfo);
   int cancelAddFace();
-  bool checkFacePose(std::vector<EntryFaceInfo> & faceinfo);
-  int confirmFace(std::string & name, bool is_host);
+  int checkFacePose(std::vector<EntryFaceInfo> &faceinfo,std::string &msg);
+  int confirmFace(std::string & name,bool is_host);
   int updateFaceId(std::string & ori_name, std::string & new_name);
+  bool updateFeaturesFile();
   int deleteFace(std::string & face_name);
   std::string getAllFaces();
   bool findFace(const std::string & face_name);
@@ -50,6 +98,16 @@ private:
   void initialize();
   bool loadFeatures();
 
+  enum FaceStatsType
+  {
+    statsFaceNum = 0,
+    statsFaceYaw,
+    statsFacePitch,
+    statsFaceRow,
+    statsFaceArea,
+    statsFaceTypeMax,
+  };
+
   std::map<std::string, std::vector<float>> m_features;
   std::map<std::string, bool> m_hostMap;
   std::mutex m_mutex;
@@ -58,6 +116,9 @@ private:
   /* save last face info, wait for user confirm */
   FaceId m_faceIdCached;
   std::vector<float> m_faceFeatsCached;
+
+  /**/
+  SizedVector<float, 10> m_faceStats[statsFaceTypeMax];
 
 };
 
