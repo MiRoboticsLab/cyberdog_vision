@@ -685,53 +685,40 @@ std::map<std::string, std::string> parse_parameters(std::string & params)
   return params_map;
 }
 
-void VisionManager::publishFaceResult(int result, const std::string & name, cv::Mat & img)
+void VisionManager::publishFaceResult(int result, const std::string & face_name, cv::Mat &img,std::string & face_msg)
 {
   auto face_result_msg = std::make_unique<FaceResultT>();
-  printf("publishFaceResult:%d %s\n", result, name.c_str());
   size_t png_size;
   unsigned char * png_data;
 
-  std::vector<unsigned char> png_buff;
-  std::vector<int> png_param = std::vector<int>(2);
-  png_param[0] = 16; //CV_IMWRITE_PNG_QUALITY;
-  png_param[1] = 3;  //default(95)
-
-  imencode(".png", img, png_buff, png_param);
-  png_size = png_buff.size();
-  png_data = (unsigned char *)malloc(png_size);
-  for (size_t i = 0; i < png_size; i++) {
-    png_data[i] = png_buff[i];
-  }
-
-#if 0
-  /*save to png file*/
-  std::string filename;
-  FILE * fp;
-  filename = "/home/mi/.faces/test.png";
-  fp = fopen(filename.c_str(), "wb+");
-  size_t remain = size;
-  int writeptr = 0;
-  int count = 0;
-  while (remain > 0) {
-    count = fwrite(mat_data + writeptr, 1, remain, fp);
-    writeptr += count;
-    remain -= count;
-  }
-  fclose(fp);
-#endif
-
   face_result_msg->result = result;
-  face_result_msg->msg = name;
-  face_result_msg->face_images.resize(1);
-  face_result_msg->face_images[0].header.frame_id = name;
-  face_result_msg->face_images[0].format = "png";
-  face_result_msg->face_images[0].data.resize(png_size);
-  //std::copy(buff.begin(),buff.end(),&(msg->face_images[0].data[0]));
-  memcpy(&(face_result_msg->face_images[0].data[0]), png_data, png_size);
-  face_result_pub_->publish(std::move(face_result_msg));
+  face_result_msg->msg = face_msg;
 
-  free(png_data);
+  if(result == 0){
+   std::vector<unsigned char> png_buff;
+   std::vector<int> png_param = std::vector<int>(2);
+   png_param[0] = 16; //CV_IMWRITE_PNG_QUALITY;
+   png_param[1] = 3;  //default(95)
+
+   imencode(".png", img, png_buff, png_param);
+   png_size = png_buff.size();
+   png_data = (unsigned char *)malloc(png_size);
+   for (size_t i = 0; i < png_size; i++) {
+     png_data[i] = png_buff[i];
+   }
+   face_result_msg->face_images.resize(1);
+   face_result_msg->face_images[0].header.frame_id = face_name;
+   face_result_msg->face_images[0].format = "png";
+   face_result_msg->face_images[0].data.resize(png_size);
+   //std::copy(buff.begin(),buff.end(),&(msg->face_images[0].data[0]));
+   memcpy(&(face_result_msg->face_images[0].data[0]), png_data, png_size);
+   face_result_pub_->publish(std::move(face_result_msg));
+
+   free(png_data);
+ }else{
+   face_result_pub_->publish(std::move(face_result_msg));
+ }
+
 }
 
 
@@ -740,10 +727,13 @@ void VisionManager::FaceDetProc(std::string face_name)
   std::map<std::string, std::vector<float>> endlib_feats;
   std::vector<MatchFaceInfo> match_info;
   cv::Mat mat_tmp;
-  bool get_face_success = false;
+  bool get_face_timeout = true;
+  std::string checkFacePose_Msg;
+  int checkFacePose_ret;
   endlib_feats = FaceManager::getInstance()->getFeatures();
   std::time_t cur_time = std::time(NULL);
-  while (std::difftime(std::time(NULL), cur_time) < 10) {
+  while (std::difftime(std::time(NULL),cur_time) < 30) {
+    get_face_timeout = false;
     std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
     global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
     global_img_buf_.is_filled = false;
@@ -753,27 +743,34 @@ void VisionManager::FaceDetProc(std::string face_name)
 
     face_ptr_->GetFaceInfo(mat_tmp, faces_info);
 
-    if (FaceManager::getInstance()->checkFacePose(faces_info)) {
+    checkFacePose_ret = FaceManager::getInstance()->checkFacePose(faces_info,checkFacePose_Msg);
+    if(checkFacePose_ret == 0) // check weather cur feature alrady in endlib
+    {
+#if 0
       /*check if face feature already in endlib_feats*/
       face_ptr_->GetRecognitionResult(mat_tmp, endlib_feats, match_info);
       //printf("match_info:match_score:%f\n",match_info[0].match_score);
-      if (match_info.size() > 0 && match_info[0].match_score > 0.9) {
+        if(match_info.size() > 0 && match_info[0].match_score > 0.9)
+        {
         publishFaceResult(-1, match_info[0].face_id, mat_tmp);
         RCLCPP_ERROR(this->get_logger(), "%s already in endlib\n", match_info[0].face_id.c_str());
-        get_face_success = true;
         break;
       }
-      /*get face info sucess*/
+#endif
       FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
-      publishFaceResult(0, face_name, mat_tmp);
-      get_face_success = true;
+    }
+    publishFaceResult(checkFacePose_ret,face_name,mat_tmp,checkFacePose_Msg);
+	RCLCPP_ERROR(this->get_logger(),"%s\n",checkFacePose_Msg.c_str());
+    if(checkFacePose_ret == 0){
       break;
     }
-
+    get_face_timeout = true;
   }
   /*it time out publish error*/
-  if (!get_face_success) {
-    publishFaceResult(-1, "timeout", mat_tmp);
+  if(get_face_timeout)
+  {
+    checkFacePose_Msg = "timeout";
+    publishFaceResult(-1,face_name,mat_tmp,checkFacePose_Msg);
   }
 }
 
