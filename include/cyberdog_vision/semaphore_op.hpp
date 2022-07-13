@@ -66,7 +66,7 @@ inline int SetSemInitVal(int sem_set_id, int sem_index, int init_val)
 
 inline int WaitSem(int sem_set_id, int sem_index)
 {
-  std::cout << "Sem_P" << std::endl;
+  // std::cout << "Sem_P" << std::endl;
   struct sembuf sem_buf;
   sem_buf.sem_num = sem_index;
   sem_buf.sem_op = -1;
@@ -82,7 +82,7 @@ inline int WaitSem(int sem_set_id, int sem_index)
 
 inline int SignalSem(int sem_set_id, int sem_index)
 {
-  std::cout << "Sem_V" << std::endl;
+  // std::cout << "Sem_V" << std::endl;
   struct sembuf sem_buf;
   sem_buf.sem_num = sem_index;
   sem_buf.sem_op = 1;

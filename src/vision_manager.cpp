@@ -26,7 +26,9 @@ namespace cyberdog_vision
 {
 
 VisionManager::VisionManager()
-: Node("vision_manager"), shm_addr_(nullptr), buf_size_(6), is_tracking_(false)
+: Node("vision_manager"), shm_addr_(nullptr), buf_size_(6), is_tracking_(false),
+  open_face_(false), open_body_(false), open_gesture_(false), open_keypoints_(false),
+  open_reid_(false), open_focus_(false)
 {
   if (0 != Init()) {
     throw std::logic_error("Init shared memory or semaphore fail. ");
@@ -136,105 +138,123 @@ void VisionManager::ImageProc()
     SignalSem(sem_set_id_, 1);
 
     // Save image to buffer, only process with real img
-    std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
-    global_img_buf_.img_buf.clear();
-    global_img_buf_.img_buf.push_back(simg);
-    global_img_buf_.is_filled = true;
-    global_img_buf_.cond.notify_one();
+    {
+      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+      global_img_buf_.img_buf.clear();
+      global_img_buf_.img_buf.push_back(simg);
+      global_img_buf_.is_filled = true;
+      global_img_buf_.cond.notify_one();
+    }
   }
 }
 
 void VisionManager::MainAlgoManager()
 {
-  std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
-  global_img_buf_.cond.wait(lk, [this] {return global_img_buf_.is_filled;});
-  global_img_buf_.is_filled = false;
-  std::cout << "===Activate main algo manager thread. " << std::endl;
-  {
-    std::lock(algo_proc_.mtx, body_struct_.mtx);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(body_struct_.mtx, std::adopt_lock);
-    if (body_struct_.is_called) {
-      algo_proc_.process_num++;
-      body_struct_.cond.notify_one();
+  while (rclcpp::ok()) {
+    {
+      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+      global_img_buf_.cond.wait(lk, [this] {return global_img_buf_.is_filled;});
+      global_img_buf_.is_filled = false;
+      std::cout << "===Activate main algo manager thread. " << std::endl;
     }
-  }
 
-  {
-    std::lock(algo_proc_.mtx, face_struct_.mtx);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(face_struct_.mtx, std::adopt_lock);
-    if (face_struct_.is_called) {
-      algo_proc_.process_num++;
-      face_struct_.cond.notify_one();
+    if (open_body_) {
+      std::lock(algo_proc_.mtx, body_struct_.mtx);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(body_struct_.mtx, std::adopt_lock);
+      if (!body_struct_.is_called) {
+        algo_proc_.process_num++;
+        body_struct_.is_called = true;
+        body_struct_.cond.notify_one();
+      }
     }
-  }
 
-  {
-    std::lock(algo_proc_.mtx, focus_struct_.mtx);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(focus_struct_.mtx, std::adopt_lock);
-    if (focus_struct_.is_called) {
-      algo_proc_.process_num++;
-      focus_struct_.cond.notify_one();
+    if (open_face_) {
+      std::lock(algo_proc_.mtx, face_struct_.mtx);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(face_struct_.mtx, std::adopt_lock);
+      if (!face_struct_.is_called) {
+        algo_proc_.process_num++;
+        face_struct_.is_called = true;
+        face_struct_.cond.notify_one();
+      }
     }
-  }
 
-  // Wait for result to pub
-  {
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
-    std::cout << "===Process complate to pub. " << std::endl;
-    person_pub_->publish(algo_result_);
+    if (open_focus_) {
+      std::lock(algo_proc_.mtx, focus_struct_.mtx);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(focus_struct_.mtx, std::adopt_lock);
+      if (!focus_struct_.is_called) {
+        algo_proc_.process_num++;
+        focus_struct_.is_called = true;
+        focus_struct_.cond.notify_one();
+      }
+    }
+
+    // Wait for result to pub
+    if (!open_gesture_ && !open_keypoints_ && !open_reid_) {
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
+      algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
+      {
+        std::unique_lock<std::mutex> lk_result(result_mtx_);
+        person_pub_->publish(algo_result_);
+      }
+    }
   }
 }
 
 void VisionManager::DependAlgoManager()
 {
-  std::unique_lock<std::mutex> lk(body_results_.mtx);
-  body_results_.cond.wait(lk, [this] {return body_results_.is_filled;});
-  body_results_.is_filled = false;
-  std::cout << "===Activate depend algo manager thread. " << std::endl;
-  {
-    std::lock(algo_proc_.mtx, reid_struct_.mtx);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(reid_struct_.mtx, std::adopt_lock);
-    if (reid_struct_.is_called) {
-      algo_proc_.process_num++;
-      reid_struct_.cond.notify_one();
+  while (rclcpp::ok()) {
+    {
+      std::unique_lock<std::mutex> lk(body_results_.mtx);
+      body_results_.cond.wait(lk, [this] {return body_results_.is_filled;});
+      body_results_.is_filled = false;
+      std::cout << "===Activate depend algo manager thread. " << std::endl;
     }
-  }
 
-  {
-    std::lock(algo_proc_.mtx, gesture_struct_.mtx);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(gesture_struct_.mtx, std::adopt_lock);
-    if (gesture_struct_.is_called) {
-      algo_proc_.process_num++;
-      gesture_struct_.cond.notify_one();
+    if (open_reid_) {
+      std::lock(algo_proc_.mtx, reid_struct_.mtx);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(reid_struct_.mtx, std::adopt_lock);
+      if (!reid_struct_.is_called) {
+        algo_proc_.process_num++;
+        reid_struct_.is_called = true;
+        reid_struct_.cond.notify_one();
+      }
     }
-  }
 
-  {
-    std::lock(algo_proc_.mtx, keypoints_struct_.mtx);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(keypoints_struct_.mtx, std::adopt_lock);
-    if (keypoints_struct_.is_called) {
-      algo_proc_.process_num++;
-      keypoints_struct_.cond.notify_one();
+    if (open_gesture_) {
+      std::lock(algo_proc_.mtx, gesture_struct_.mtx);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(gesture_struct_.mtx, std::adopt_lock);
+      if (!gesture_struct_.is_called) {
+        algo_proc_.process_num++;
+        gesture_struct_.is_called = true;
+        gesture_struct_.cond.notify_one();
+      }
     }
-  }
 
-  // Wait for result to pub
-  {
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
-    std::cout << "===Process complate to pub. " << std::endl;
-    person_pub_->publish(algo_result_);
+    if (open_keypoints_) {
+      std::lock(algo_proc_.mtx, keypoints_struct_.mtx);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(keypoints_struct_.mtx, std::adopt_lock);
+      if (!keypoints_struct_.is_called) {
+        algo_proc_.process_num++;
+        keypoints_struct_.is_called = true;
+        keypoints_struct_.cond.notify_one();
+      }
+    }
+
+    // Wait for result to pub
+    if (open_gesture_ || open_keypoints_ || open_reid_) {
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
+      algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
+      {
+        std::unique_lock<std::mutex> lk_result(result_mtx_);
+        person_pub_->publish(algo_result_);
+      }
+    }
   }
 }
 
@@ -242,6 +262,7 @@ void Convert(const std_msgs::msg::Header & header, const BodyFrameInfo & from, B
 {
   to.header = header;
   to.count = from.size();
+  to.infos.clear();
   for (size_t i = 0; i < from.size(); ++i) {
     BodyT body;
     body.roi.x_offset = from[i].left;
@@ -255,13 +276,14 @@ void Convert(const std_msgs::msg::Header & header, const BodyFrameInfo & from, B
 void VisionManager::BodyDet()
 {
   while (rclcpp::ok()) {
-    std::lock(body_struct_.mtx, body_results_.mtx);
-    std::unique_lock<std::mutex> lk_struct(body_struct_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
-    body_struct_.cond.wait(lk_struct, [this] {return body_struct_.is_called;});
-    std::cout << "===Activate body detect thread. " << std::endl;
+    {
+      std::unique_lock<std::mutex> lk_struct(body_struct_.mtx);
+      body_struct_.cond.wait(lk_struct, [this] {return body_struct_.is_called;});
+      body_struct_.is_called = false;
+      std::cout << "===Activate body detect thread. " << std::endl;
+    }
 
-    // Get image to proc
+    // Get image and detect body
     StampedImage stamped_img;
     {
       std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
@@ -269,39 +291,44 @@ void VisionManager::BodyDet()
     }
 
     BodyFrameInfo infos;
-    if (-1 != body_ptr_->Detect(stamped_img.img, infos)) {
-      if (body_results_.body_infos.size() >= buf_size_) {
-        body_results_.body_infos.erase(body_results_.body_infos.begin());
-      }
-      body_results_.body_infos.push_back(infos);
-      body_results_.detection_img.img = stamped_img.img.clone();
-      body_results_.detection_img.header = stamped_img.header;
-      body_results_.is_filled = true;
-      body_results_.cond.notify_one();
+    {
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+      if (-1 != body_ptr_->Detect(stamped_img.img, infos)) {
+        if (body_results_.body_infos.size() >= buf_size_) {
+          body_results_.body_infos.erase(body_results_.body_infos.begin());
+        }
+        body_results_.body_infos.push_back(infos);
+        body_results_.detection_img.img = stamped_img.img.clone();
+        body_results_.detection_img.header = stamped_img.header;
+        body_results_.is_filled = true;
+        body_results_.cond.notify_one();
 
-      // debug - visualization
-      // std::cout << "Detection result: " << std::endl;
-      // std::cout << "Person num: " << infos.size() << std::endl;
-      // cv::Mat img_show = stamped_img.img.clone();
-      // for (auto & res : infos) {
-      //   cv::rectangle(
-      //     img_show, cv::Rect(res.left, res.top, res.width, res.height),
-      //     cv::Scalar(0, 0, 255));
-      // }
-      // cv::imshow("vision", img_show);
-      // cv::waitKey(10);
-    } else {
-      RCLCPP_WARN(get_logger(), "Body detect fail of current image. ");
+        // debug - visualization
+        // std::cout << "Detection result: " << std::endl;
+        // std::cout << "Person num: " << infos.size() << std::endl;
+        // cv::Mat img_show = stamped_img.img.clone();
+        // for (auto & res : infos) {
+        //   cv::rectangle(
+        //     img_show, cv::Rect(res.left, res.top, res.width, res.height),
+        //     cv::Scalar(0, 0, 255));
+        // }
+        // cv::imshow("vision", img_show);
+        // cv::waitKey(10);
+      } else {
+        RCLCPP_WARN(get_logger(), "Body detect fail of current image. ");
+      }
     }
 
     // Storage body detection result
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.process_num--;
-    Convert(stamped_img.header, infos, algo_result_.body_info);
-    if (0 == algo_proc_.process_num) {
-      algo_proc_.cond.notify_one();
+    {
+      std::lock(algo_proc_.mtx, result_mtx_);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
+      algo_proc_.process_num--;
+      Convert(stamped_img.header, infos, algo_result_.body_info);
+      if (0 == algo_proc_.process_num) {
+        algo_proc_.cond.notify_one();
+      }
     }
   }
 }
@@ -312,6 +339,7 @@ void Convert(
 {
   to.header = header;
   to.count = from.size();
+  to.infos.clear();
   for (size_t i = 0; i < from.size(); ++i) {
     FaceT face;
     face.roi.x_offset = from[i].rect.left;
@@ -323,15 +351,19 @@ void Convert(
     face.yaw = from[i].poses[0];
     face.pitch = from[i].poses[1];
     face.row = from[i].poses[2];
+    to.infos.push_back(face);
   }
 }
 
 void VisionManager::FaceRecognize()
 {
   while (rclcpp::ok()) {
-    std::unique_lock<std::mutex> lk(face_struct_.mtx);
-    face_struct_.cond.wait(lk, [this] {return face_struct_.is_called;});
-    std::cout << "===Activate face recognition thread. " << std::endl;
+    {
+      std::unique_lock<std::mutex> lk(face_struct_.mtx);
+      face_struct_.cond.wait(lk, [this] {return face_struct_.is_called;});
+      face_struct_.is_called = false;
+      std::cout << "===Activate face recognition thread. " << std::endl;
+    }
 
     // Get image to proc
     StampedImage stamped_img;
@@ -347,13 +379,15 @@ void VisionManager::FaceRecognize()
     }
 
     // Storage face recognition result
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.process_num--;
-    Convert(stamped_img.header, result, algo_result_.face_info);
-    if (0 == algo_proc_.process_num) {
-      algo_proc_.cond.notify_one();
+    {
+      std::lock(algo_proc_.mtx, result_mtx_);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
+      algo_proc_.process_num--;
+      Convert(stamped_img.header, result, algo_result_.face_info);
+      if (0 == algo_proc_.process_num) {
+        algo_proc_.cond.notify_one();
+      }
     }
   }
 }
@@ -361,20 +395,27 @@ void VisionManager::FaceRecognize()
 void VisionManager::FocusTrack()
 {
   while (rclcpp::ok()) {
-    std::unique_lock<std::mutex> lk(focus_struct_.mtx);
-    focus_struct_.cond.wait(lk, [this] {return focus_struct_.is_called;});
-    std::cout << "===Activate focus thread. " << std::endl;
+    {
+      std::unique_lock<std::mutex> lk(focus_struct_.mtx);
+      focus_struct_.cond.wait(lk, [this] {return focus_struct_.is_called;});
+      focus_struct_.is_called = false;
+      std::cout << "===Activate focus thread. " << std::endl;
+    }
+
     // TODO: focus track and get result
 
     // Storage foucs track result
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.process_num--;
+    {
+      std::lock(algo_proc_.mtx, result_mtx_);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
+      algo_proc_.process_num--;
 
-    // TODO: Convert data to publish
-    if (0 == algo_proc_.process_num) {
-      algo_proc_.cond.notify_one();
+      // TODO: Convert data to publish
+
+      if (0 == algo_proc_.process_num) {
+        algo_proc_.cond.notify_one();
+      }
     }
   }
 }
@@ -385,31 +426,35 @@ void VisionManager::ReIDProc()
     int person_id = -1;
     size_t person_index;
     {
-      std::lock(reid_struct_.mtx, body_results_.mtx);
-      std::unique_lock<std::mutex> lk_reid(reid_struct_.mtx, std::adopt_lock);
-      std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_reid(reid_struct_.mtx);
       reid_struct_.cond.wait(lk_reid, [this] {return reid_struct_.is_called;});
-      std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
-      if (-1 !=
-        reid_ptr_->GetReIDInfo(
-          body_results_.detection_img.img, body_bboxes, person_id,
-          person_index) &&
-        -1 != person_id)
+      reid_struct_.is_called = false;
       {
-        RCLCPP_INFO(get_logger(), "Reid result, person id: %d", person_id);
+        std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
+        std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
+        if (-1 !=
+          reid_ptr_->GetReIDInfo(
+            body_results_.detection_img.img, body_bboxes, person_id,
+            person_index) &&
+          -1 != person_id)
+        {
+          RCLCPP_INFO(get_logger(), "Reid result, person id: %d", person_id);
+        }
       }
     }
 
     // Storage reid result
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.process_num--;
-    if (-1 != person_id) {
-      algo_result_.body_info.infos[person_index].reid = std::to_string(person_id);
-    }
-    if (0 == algo_proc_.process_num) {
-      algo_proc_.cond.notify_one();
+    {
+      std::lock(algo_proc_.mtx, result_mtx_);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
+      algo_proc_.process_num--;
+      if (-1 != person_id) {
+        algo_result_.body_info.infos[person_index].reid = std::to_string(person_id);
+      }
+      if (0 == algo_proc_.process_num) {
+        algo_proc_.cond.notify_one();
+      }
     }
   }
 }
@@ -417,20 +462,26 @@ void VisionManager::ReIDProc()
 void VisionManager::GestureRecognize()
 {
   while (rclcpp::ok()) {
-    std::unique_lock<std::mutex> lk(gesture_struct_.mtx);
-    gesture_struct_.cond.wait(lk, [this] {return gesture_struct_.is_called;});
-    std::cout << "===Activate gesture recognition thread. " << std::endl;
+    {
+      std::unique_lock<std::mutex> lk(gesture_struct_.mtx);
+      gesture_struct_.cond.wait(lk, [this] {return gesture_struct_.is_called;});
+      gesture_struct_.is_called = false;
+      std::cout << "===Activate gesture recognition thread. " << std::endl;
+    }
+
     // TODO: gesture recognition and get result
 
     // Storage gesture recognition result
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.process_num--;
-    // TODO: Convert data to publish
+    {
+      std::lock(algo_proc_.mtx, result_mtx_);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
+      algo_proc_.process_num--;
+      // TODO: Convert data to publish
 
-    if (0 == algo_proc_.process_num) {
-      algo_proc_.cond.notify_one();
+      if (0 == algo_proc_.process_num) {
+        algo_proc_.cond.notify_one();
+      }
     }
   }
 }
@@ -438,20 +489,26 @@ void VisionManager::GestureRecognize()
 void VisionManager::KeypointsDet()
 {
   while (rclcpp::ok()) {
-    std::unique_lock<std::mutex> lk(keypoints_struct_.mtx);
-    keypoints_struct_.cond.wait(lk, [this] {return keypoints_struct_.is_called;});
-    std::cout << "===Activate keypoints detection thread. " << std::endl;
+    {
+      std::unique_lock<std::mutex> lk(keypoints_struct_.mtx);
+      keypoints_struct_.cond.wait(lk, [this] {return keypoints_struct_.is_called;});
+      keypoints_struct_.is_called = false;
+      std::cout << "===Activate keypoints detection thread. " << std::endl;
+    }
+
     // TODO: keypoints detection and get result
 
     // Storage keypoints detection result
-    std::lock(algo_proc_.mtx, result_mtx_);
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
-    std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
-    algo_proc_.process_num--;
-    // TODO: Convert data to publish
+    {
+      std::lock(algo_proc_.mtx, result_mtx_);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
+      algo_proc_.process_num--;
+      // TODO: Convert data to publish
 
-    if (0 == algo_proc_.process_num) {
-      algo_proc_.cond.notify_one();
+      if (0 == algo_proc_.process_num) {
+        algo_proc_.cond.notify_one();
+      }
     }
   }
 }
@@ -540,38 +597,26 @@ void VisionManager::SetAlgoState(const AlgoListT & algo_list, const bool & value
 {
   std::cout << "Algo type: " << algo_list.algo_module << std::endl;
   switch (algo_list.algo_module) {
-    case AlgoListT::ALGO_FACE: {
-        std::unique_lock<std::mutex> lk(face_struct_.mtx);
-        face_struct_.is_called = value;
-        if (value) {
-          LoadFaceLibrary(face_library_);
-        }
+    case AlgoListT::ALGO_FACE:
+      open_face_ = value;
+      if (value) {
+        LoadFaceLibrary(face_library_);
       }
       break;
-    case AlgoListT::ALGO_BODY: {
-        std::unique_lock<std::mutex> lk(body_struct_.mtx);
-        body_struct_.is_called = value;
-      }
+    case AlgoListT::ALGO_BODY:
+      open_body_ = value;
       break;
-    case AlgoListT::ALGO_GESTURE: {
-        std::unique_lock<std::mutex> lk(gesture_struct_.mtx);
-        gesture_struct_.is_called = value;
-      }
+    case AlgoListT::ALGO_GESTURE:
+      open_gesture_ = value;
       break;
-    case AlgoListT::ALGO_KEYPOINTS: {
-        std::unique_lock<std::mutex> lk(keypoints_struct_.mtx);
-        keypoints_struct_.is_called = value;
-      }
+    case AlgoListT::ALGO_KEYPOINTS:
+      open_keypoints_ = value;
       break;
-    case AlgoListT::ALGO_REID: {
-        std::unique_lock<std::mutex> lk(reid_struct_.mtx);
-        reid_struct_.is_called = value;
-      }
+    case AlgoListT::ALGO_REID:
+      open_reid_ = value;
       break;
-    case AlgoListT::ALGO_FOCUS: {
-        std::unique_lock<std::mutex> lk(focus_struct_.mtx);
-        focus_struct_.is_called = value;
-      }
+    case AlgoListT::ALGO_FOCUS:
+      open_focus_ = value;
       break;
     default:
       break;

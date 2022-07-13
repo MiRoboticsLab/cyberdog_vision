@@ -130,6 +130,8 @@ private:
   std::shared_ptr<PersonReID> reid_ptr_;
   std::shared_ptr<FaceRecognition> face_ptr_;
 
+  std::map<std::string, std::vector<float>> face_library_;
+
   GlobalImageBuf global_img_buf_;
   BodyResults body_results_;
 
@@ -144,14 +146,19 @@ private:
   std::mutex result_mtx_;
   PersonInfoT algo_result_;
 
-  std::map<std::string, std::vector<float>> face_library_;
-
   int shm_id_;
   int sem_set_id_;
   char * shm_addr_;
 
   size_t buf_size_;
   bool is_tracking_;
+  bool open_face_;
+  bool open_body_;
+  bool open_gesture_;
+  bool open_keypoints_;
+  bool open_reid_;
+  bool open_focus_;
+
 
 };
 
