@@ -100,11 +100,11 @@ private:
     rclcpp::Client<CameraServiceT>::SharedPtr & client, const uint8_t & cmd,
     const std::string & args);
 
-  int addFaceInfo(std::string & args);
+  int addFaceInfo(std::string & username, bool is_host);
   int cancelAddFace();
-  int confirmFace(std::string & args);
+  int confirmFace(std::string & username, bool is_host);
   int startFaceMatch();
-  int updateFaceId(std::string & args);
+  int updateFaceId(std::string & username, std::string & ori_name);
   int deleteFace(std::string & face_name);
   int getAllFaces(std::shared_ptr<FaceManagerT::Response> response);
 

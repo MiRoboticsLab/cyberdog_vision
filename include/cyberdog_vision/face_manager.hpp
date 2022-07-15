@@ -118,7 +118,7 @@ private:
   std::vector<float> m_faceFeatsCached;
 
   /**/
-  SizedVector<float, 10> m_faceStats[statsFaceTypeMax];
+  SizedVector<float, 6> m_faceStats[statsFaceTypeMax];
 
 };
 
