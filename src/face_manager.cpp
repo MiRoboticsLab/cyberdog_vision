@@ -32,12 +32,11 @@ static const char * label_path = "/home/mi/.faces/faceinfo.yaml";
 // key value to judge whether face is legal or not.
 static const float FACE_NUMBER_STABLE_VAL = 0.0f;
 static const float FACE_POSE_STABLE_THRES = 3.0f;
-static const float FACE_POSE_YAW_LEGAL_THRES = 20.0f;
-static const float FACE_POSE_PITCH_LEGAL_THRES = 10.0f;
-static const float FACE_POSE_ROW_LEGAL_THRES = 20.0f;
+static const float FACE_POSE_YAW_LEGAL_THRES = 30.0f;
+static const float FACE_POSE_PITCH_LEGAL_THRES = 20.0f;
+static const float FACE_POSE_ROW_LEGAL_THRES = 30.0f;
 static const float FACE_AREA_STABLE_THRES = 0.0010f;
 static const float FACE_AREA_LEGAL_THRES = 0.005f;
-
 
 void get_mean_stdev(std::vector<float> & vec, float & mean, double & stdev)
 {
@@ -198,7 +197,25 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string
     return 9;
   }
 
-  // 2.face pose
+  // face distance
+  if (m_faceStats[statsFaceArea].full()) {
+    get_mean_stdev(m_faceStats[statsFaceArea].vector(), mean[statsFaceArea], stdev[statsFaceArea]);
+    if (stdev[statsFaceArea] < FACE_AREA_STABLE_THRES) {
+      if (mean[statsFaceArea] > FACE_AREA_LEGAL_THRES) {
+        //cout << "Nice, distance is OK!!" <<  mean[statsFaceArea] << endl;
+      } else {
+        //cout << "Distance is NOT OK!! "<< endl;
+		msg = "Distance is NOT OK!!";
+        return 11;
+      }
+    } else {
+      //cout << "keep stable!!" << endl;
+      msg = "keep stable!!";
+	  return 9;
+    }
+  }
+
+  // 3.face pose
   if (m_faceStats[statsFaceYaw].full() &&
     m_faceStats[statsFacePitch].full() &&
     m_faceStats[statsFaceRow].full())
@@ -206,10 +223,6 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string
     get_mean_stdev(m_faceStats[statsFaceYaw].vector(), mean[statsFaceYaw], stdev[statsFaceYaw]);
     get_mean_stdev(m_faceStats[statsFacePitch].vector(), mean[statsFacePitch],stdev[statsFacePitch]);
     get_mean_stdev(m_faceStats[statsFaceRow].vector(), mean[statsFaceRow], stdev[statsFaceRow]);
-    printf("face num = %lu, mean(%f, %f, %f), stdev(%f, %f, %f)\n",
-      faceinfos.size(),
-      mean[1], mean[2], mean[3],
-      stdev[1], stdev[2], stdev[3]);
     if (stdev[statsFaceYaw] < FACE_POSE_STABLE_THRES &&
       stdev[statsFacePitch] < FACE_POSE_STABLE_THRES &&
       stdev[statsFaceRow] < FACE_POSE_STABLE_THRES)
@@ -219,37 +232,24 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string
         abs(mean[statsFaceRow]) < FACE_POSE_ROW_LEGAL_THRES)
       {
         cout << "Nice, degree is OK!!" << endl;
+		msg = "check Face Pose success!!";
+        return 0;
       } else {
-        cout << "Degree is NOT OK!!" << endl;
+        //printf("mean (%f, %f) (%f,%f) (%f,%f) \n",
+        //mean[1],FACE_POSE_YAW_LEGAL_THRES, mean[2],FACE_POSE_PITCH_LEGAL_THRES, mean[3],FACE_POSE_ROW_LEGAL_THRES);
+        //cout << "Degree is NOT OK!!" << endl;
 		msg = "Degree is NOT OK!!";
         return 10;
       }
     } else {
-      cout << "Degree is not stable!!" << endl;
+      //printf("stable pose (%f, %f) (%f,%f) (%f,%f) \n",
+      //stdev[1],FACE_POSE_STABLE_THRES, stdev[2],FACE_POSE_STABLE_THRES, stdev[3],FACE_POSE_STABLE_THRES);
+      //cout << "Degree is not stable!!" << endl;
 	  msg = "keep stable!!";
       return 9;
     }
   }
 
-  // face distance
-  if (m_faceStats[statsFaceArea].full()) {
-    get_mean_stdev(m_faceStats[statsFaceArea].vector(), mean[statsFaceArea], stdev[statsFaceArea]);
-    if (stdev[statsFaceArea] < FACE_AREA_STABLE_THRES) {
-      if (mean[statsFaceArea] > FACE_AREA_LEGAL_THRES) {
-        cout << "Nice, distance is OK!!" <<  mean[statsFaceArea] << endl;
-		msg = "check Face Pose success!!";
-        return 0;
-      } else {
-        cout << "Distance is NOT OK!! " <<  mean[statsFaceArea];
-		msg = "Distance is NOT OK!!";
-        return 11;
-      }
-    } else {
-      cout << "keep stable!!" << endl;
-      msg = "keep stable!!";
-	  return 9;
-    }
-  }
   //can't reach here
   msg = "keep stable!!";
   return 9;
@@ -277,7 +277,7 @@ int FaceManager::cancelAddFace()
   return 0;
 }
 
-int FaceManager::confirmFace(std::string &name,bool is_host)
+int FaceManager::confirmFace(std::string &name, bool is_host)
 {
   std::string filename;
 
