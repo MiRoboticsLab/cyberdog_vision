@@ -96,14 +96,12 @@ bool FaceManager::updateFeaturesFile()
   bool is_host;
   vector<float> face_feature;
   cv::FileStorage fs(faceinfofile, cv::FileStorage::WRITE);
-  if (!fs.isOpened())
-  {
-      cout << "cannot open xml file to write" << endl;
-      return false;
+  if (!fs.isOpened()) {
+    cout << "cannot open xml file to write" << endl;
+    return false;
   }
   fs << "UserFaceInfo" << "[";
-  for (feature_iter = m_features.begin();feature_iter != m_features.end();feature_iter++)
-  {
+  for (feature_iter = m_features.begin(); feature_iter != m_features.end(); feature_iter++) {
     //std::cout << feature_iter->first << " : " << feature_iter->second << std::endl;
     face_name = feature_iter->first;
     face_feature = feature_iter->second;
@@ -131,14 +129,13 @@ bool FaceManager::loadFeatures()
   vector<float> face_feature;
 
   cv::FileStorage file_read(faceinfofile, cv::FileStorage::READ);
-  if (!file_read.isOpened())
-  {
+  if (!file_read.isOpened()) {
     cout << "cannot open yaml file to write" << endl;
     return false;
   }
 
   cv::FileNode UserFaceInfo = file_read["UserFaceInfo"];
-  for(cv::FileNodeIterator it = UserFaceInfo.begin(); it != UserFaceInfo.end(); ++it){
+  for (cv::FileNodeIterator it = UserFaceInfo.begin(); it != UserFaceInfo.end(); ++it) {
     (*it)["name"] >> face_name;
     (*it)["feature"] >> face_feature;
     (*it)["is_host"] >> is_host;
@@ -153,7 +150,7 @@ bool FaceManager::loadFeatures()
   return true;
 }
 
-int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string &msg)
+int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::string & msg)
 {
   float mean[statsFaceTypeMax];
   double stdev[statsFaceTypeMax];
@@ -170,7 +167,8 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string
     m_faceStats[statsFacePitch].push_back(faceinfos[0].poses[1]);
     m_faceStats[statsFaceRow].push_back(faceinfos[0].poses[2]);
     m_faceStats[statsFaceArea].push_back(
-      static_cast<float>((faceinfos[0].rect.right - faceinfos[0].rect.left) * (faceinfos[0].rect.bottom - faceinfos[0].rect.top)) / (640 * 480));
+      static_cast<float>((faceinfos[0].rect.right - faceinfos[0].rect.left) *
+      (faceinfos[0].rect.bottom - faceinfos[0].rect.top)) / (640 * 480));
   }
 
   // 1.face number should be exactly 1
@@ -189,7 +187,7 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string
       }
     } else {
       //cout << "Face number not stable!!" << endl;
-	  msg = "keep stable!!";
+      msg = "keep stable!!";
       return 9;
     }
   } else {
@@ -205,13 +203,13 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string
         //cout << "Nice, distance is OK!!" <<  mean[statsFaceArea] << endl;
       } else {
         //cout << "Distance is NOT OK!! "<< endl;
-		msg = "Distance is NOT OK!!";
+        msg = "Distance is NOT OK!!";
         return 11;
       }
     } else {
       //cout << "keep stable!!" << endl;
       msg = "keep stable!!";
-	  return 9;
+      return 9;
     }
   }
 
@@ -221,7 +219,9 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string
     m_faceStats[statsFaceRow].full())
   {
     get_mean_stdev(m_faceStats[statsFaceYaw].vector(), mean[statsFaceYaw], stdev[statsFaceYaw]);
-    get_mean_stdev(m_faceStats[statsFacePitch].vector(), mean[statsFacePitch],stdev[statsFacePitch]);
+    get_mean_stdev(
+      m_faceStats[statsFacePitch].vector(), mean[statsFacePitch],
+      stdev[statsFacePitch]);
     get_mean_stdev(m_faceStats[statsFaceRow].vector(), mean[statsFaceRow], stdev[statsFaceRow]);
     if (stdev[statsFaceYaw] < FACE_POSE_STABLE_THRES &&
       stdev[statsFacePitch] < FACE_POSE_STABLE_THRES &&
@@ -232,20 +232,20 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> &faceinfos,std::string
         abs(mean[statsFaceRow]) < FACE_POSE_ROW_LEGAL_THRES)
       {
         cout << "Nice, degree is OK!!" << endl;
-		msg = "check Face Pose success!!";
+        msg = "check Face Pose success!!";
         return 0;
       } else {
         //printf("mean (%f, %f) (%f,%f) (%f,%f) \n",
         //mean[1],FACE_POSE_YAW_LEGAL_THRES, mean[2],FACE_POSE_PITCH_LEGAL_THRES, mean[3],FACE_POSE_ROW_LEGAL_THRES);
         //cout << "Degree is NOT OK!!" << endl;
-		msg = "Degree is NOT OK!!";
+        msg = "Degree is NOT OK!!";
         return 10;
       }
     } else {
       //printf("stable pose (%f, %f) (%f,%f) (%f,%f) \n",
       //stdev[1],FACE_POSE_STABLE_THRES, stdev[2],FACE_POSE_STABLE_THRES, stdev[3],FACE_POSE_STABLE_THRES);
       //cout << "Degree is not stable!!" << endl;
-	  msg = "keep stable!!";
+      msg = "keep stable!!";
       return 9;
     }
   }
@@ -277,23 +277,23 @@ int FaceManager::cancelAddFace()
   return 0;
 }
 
-int FaceManager::confirmFace(std::string &name, bool is_host)
+int FaceManager::confirmFace(std::string & name, bool is_host)
 {
   std::string filename;
 
-  std::cout << "confirm last face name: " << m_faceIdCached.name << " is_host: " << m_faceIdCached.is_host << std::endl;
-  if(m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host)
-  {
-    std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name << std::endl;
+  std::cout << "confirm last face name: " << m_faceIdCached.name << " is_host: " <<
+    m_faceIdCached.is_host << std::endl;
+  if (m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host) {
+    std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name <<
+      std::endl;
     return -1;
   }
-  if(m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host)
-  {
-    std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name << std::endl;
+  if (m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host) {
+    std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name <<
+      std::endl;
     return -1;
   }
-  if(m_faceFeatsCached.empty())
-  {
+  if (m_faceFeatsCached.empty()) {
     std::cout << "Error:faceFeatsCached empty..." << std::endl;
     return -1;
   }
@@ -358,8 +358,7 @@ std::string FaceManager::getAllFaces()
   int is_host;
   std::map<std::string, std::vector<float>>::iterator feature_iter;
 
-  for (feature_iter = m_features.begin();feature_iter != m_features.end();feature_iter++)
-  {
+  for (feature_iter = m_features.begin(); feature_iter != m_features.end(); feature_iter++) {
     face_name = feature_iter->first;
     is_host = m_hostMap[face_name];
 

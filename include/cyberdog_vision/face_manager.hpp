@@ -83,8 +83,8 @@ public:
   int addFaceIDCacheInfo(std::string & name, bool is_host);
   int addFaceFeatureCacheInfo(std::vector<EntryFaceInfo> & faceinfo);
   int cancelAddFace();
-  int checkFacePose(std::vector<EntryFaceInfo> &faceinfo,std::string &msg);
-  int confirmFace(std::string & name,bool is_host);
+  int checkFacePose(std::vector<EntryFaceInfo> & faceinfo, std::string & msg);
+  int confirmFace(std::string & name, bool is_host);
   int updateFaceId(std::string & ori_name, std::string & new_name);
   bool updateFeaturesFile();
   int deleteFace(std::string & face_name);

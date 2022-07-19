@@ -75,9 +75,15 @@ add_executable(test_ai
 ament_target_dependencies(vision_manager rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID XmTrack)
 ament_target_dependencies(test_ai rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID XmTrack)
 
+add_executable(client
+  src/client.cpp
+)
+ament_target_dependencies(client rclcpp protocol)
+
 install(TARGETS
   vision_manager
   test_ai
+  client
   DESTINATION lib/${PROJECT_NAME}
 )
 

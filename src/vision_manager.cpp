@@ -691,7 +691,9 @@ void VisionManager::FaceManagerService(
   }
 }
 
-void VisionManager::publishFaceResult(int result, const std::string & face_name, cv::Mat &img,std::string & face_msg)
+void VisionManager::publishFaceResult(
+  int result, const std::string & face_name, cv::Mat & img,
+  std::string & face_msg)
 {
   auto face_result_msg = std::make_unique<FaceResultT>();
   size_t png_size;
@@ -700,29 +702,29 @@ void VisionManager::publishFaceResult(int result, const std::string & face_name,
   face_result_msg->result = result;
   face_result_msg->msg = face_msg;
 
-  if(result == 0){
-   std::vector<unsigned char> png_buff;
-   std::vector<int> png_param = std::vector<int>(2);
-   png_param[0] = 16; //CV_IMWRITE_PNG_QUALITY;
-   png_param[1] = 3;  //default(95)
+  if (result == 0) {
+    std::vector<unsigned char> png_buff;
+    std::vector<int> png_param = std::vector<int>(2);
+    png_param[0] = 16; //CV_IMWRITE_PNG_QUALITY;
+    png_param[1] = 3; //default(95)
 
-   imencode(".png", img, png_buff, png_param);
-   png_size = png_buff.size();
-   png_data = (unsigned char *)malloc(png_size);
-   for (size_t i = 0; i < png_size; i++) {
-     png_data[i] = png_buff[i];
-   }
-   face_result_msg->face_images.resize(1);
-   face_result_msg->face_images[0].header.frame_id = face_name;
-   face_result_msg->face_images[0].format = "png";
-   face_result_msg->face_images[0].data.resize(png_size);
-   memcpy(&(face_result_msg->face_images[0].data[0]), png_data, png_size);
-   face_result_pub_->publish(std::move(face_result_msg));
+    imencode(".png", img, png_buff, png_param);
+    png_size = png_buff.size();
+    png_data = (unsigned char *)malloc(png_size);
+    for (size_t i = 0; i < png_size; i++) {
+      png_data[i] = png_buff[i];
+    }
+    face_result_msg->face_images.resize(1);
+    face_result_msg->face_images[0].header.frame_id = face_name;
+    face_result_msg->face_images[0].format = "png";
+    face_result_msg->face_images[0].data.resize(png_size);
+    memcpy(&(face_result_msg->face_images[0].data[0]), png_data, png_size);
+    face_result_pub_->publish(std::move(face_result_msg));
 
-   free(png_data);
- }else{
-   face_result_pub_->publish(std::move(face_result_msg));
- }
+    free(png_data);
+  } else {
+    face_result_pub_->publish(std::move(face_result_msg));
+  }
 
 }
 
@@ -737,7 +739,7 @@ void VisionManager::FaceDetProc(std::string face_name)
   int checkFacePose_ret;
   endlib_feats = FaceManager::getInstance()->getFeatures();
   std::time_t cur_time = std::time(NULL);
-  while (std::difftime(std::time(NULL),cur_time) < 40) {
+  while (std::difftime(std::time(NULL), cur_time) < 40) {
     get_face_timeout = false;
     std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
     global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
@@ -749,25 +751,25 @@ void VisionManager::FaceDetProc(std::string face_name)
     face_ptr_->GetFaceInfo(mat_tmp, faces_info);
 #if 0
     // debug - visualization
-   if(faces_info.size() == 1){
-      cv::rectangle(mat_tmp,
-         cv::Rect(faces_info[0].rect.left, faces_info[0].rect.top,
-         (faces_info[0].rect.right - faces_info[0].rect.left),
-         (faces_info[0].rect.bottom - faces_info[0].rect.top)),
-         cv::Scalar(0, 0, 255));
+    if (faces_info.size() == 1) {
+      cv::rectangle(
+        mat_tmp,
+        cv::Rect(
+          faces_info[0].rect.left, faces_info[0].rect.top,
+          (faces_info[0].rect.right - faces_info[0].rect.left),
+          (faces_info[0].rect.bottom - faces_info[0].rect.top)),
+        cv::Scalar(0, 0, 255));
     }
     cv::imshow("face", mat_tmp);
     cv::waitKey(10);
 #endif
-    checkFacePose_ret = FaceManager::getInstance()->checkFacePose(faces_info,checkFacePose_Msg);
-    if(checkFacePose_ret == 0) // check weather cur feature alrady in endlib
-    {
+    checkFacePose_ret = FaceManager::getInstance()->checkFacePose(faces_info, checkFacePose_Msg);
+    if (checkFacePose_ret == 0) { // check weather cur feature alrady in endlib
 #if 0
       /*check if face feature already in endlib_feats*/
       face_ptr_->GetRecognitionResult(mat_tmp, endlib_feats, match_info);
       //printf("match_info:match_score:%f\n",match_info[0].match_score);
-        if(match_info.size() > 0 && match_info[0].match_score > 0.9)
-        {
+      if (match_info.size() > 0 && match_info[0].match_score > 0.9) {
         publishFaceResult(-1, match_info[0].face_id, mat_tmp);
         RCLCPP_ERROR(this->get_logger(), "%s already in endlib\n", match_info[0].face_id.c_str());
         break;
@@ -775,24 +777,23 @@ void VisionManager::FaceDetProc(std::string face_name)
 #endif
       FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
     }
-    publishFaceResult(checkFacePose_ret,face_name,mat_tmp,checkFacePose_Msg);
+    publishFaceResult(checkFacePose_ret, face_name, mat_tmp, checkFacePose_Msg);
     cout << "cur status:" << checkFacePose_Msg << endl;
-    if(checkFacePose_ret == 0){
+    if (checkFacePose_ret == 0) {
       break;
     }
     get_face_timeout = true;
   }
   /*it time out publish error*/
-  if(get_face_timeout)
-  {
+  if (get_face_timeout) {
     checkFacePose_Msg = "timeout";
-    publishFaceResult(3,face_name,mat_tmp,checkFacePose_Msg);
+    publishFaceResult(3, face_name, mat_tmp, checkFacePose_Msg);
   }
 }
 
 int VisionManager::addFaceInfo(std::string & username, bool is_host)
 {
-  cout << "addFaceInfo: " << username << "is_host: " << is_host <<endl;
+  cout << "addFaceInfo: " << username << "is_host: " << is_host << endl;
   if (username.length() == 0) {
     return -1;
   }
@@ -811,7 +812,7 @@ int VisionManager::cancelAddFace()
 
 int VisionManager::confirmFace(std::string & username, bool is_host)
 {
-  cout << "confirmFace username:" << username << "is_host:" << is_host  << endl;
+  cout << "confirmFace username:" << username << "is_host:" << is_host << endl;
   if (username.length() == 0) {
     return -1;
   }
@@ -821,7 +822,7 @@ int VisionManager::confirmFace(std::string & username, bool is_host)
 
 int VisionManager::updateFaceId(std::string & username, std::string & ori_name)
 {
-  cout << "updateFaceId username:" << username << "ori_name:" << ori_name  << endl;
+  cout << "updateFaceId username:" << username << "ori_name:" << ori_name << endl;
   if (username.length() == 0 || ori_name.length() == 0) {
     return -1;
   }

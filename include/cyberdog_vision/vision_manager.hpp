@@ -79,7 +79,9 @@ private:
   int GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi);
   void SetAlgoState(const AlgoListT & algo_list, const bool & value);
 
-  void publishFaceResult(int result, const std::string & name, cv::Mat &img, std::string & face_msg);
+  void publishFaceResult(
+    int result, const std::string & name, cv::Mat & img,
+    std::string & face_msg);
 
   void TrackingService(
     const std::shared_ptr<rmw_request_id_t>,
