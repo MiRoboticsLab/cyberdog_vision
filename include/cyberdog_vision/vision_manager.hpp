@@ -102,14 +102,6 @@ private:
     rclcpp::Client<CameraServiceT>::SharedPtr & client, const uint8_t & cmd,
     const std::string & args);
 
-  int addFaceInfo(std::string & username, bool is_host);
-  int cancelAddFace();
-  int confirmFace(std::string & username, bool is_host);
-  int startFaceMatch();
-  int updateFaceId(std::string & username, std::string & ori_name);
-  int deleteFace(std::string & face_name);
-  int getAllFaces(std::shared_ptr<FaceManagerT::Response> response);
-
 private:
   rclcpp::Service<BodyRegionT>::SharedPtr tracking_service_;
   rclcpp::Service<AlgoManagerT>::SharedPtr algo_manager_service_;
@@ -160,7 +152,7 @@ private:
   bool open_keypoints_;
   bool open_reid_;
   bool open_focus_;
-
+  bool face_detect_;
 
 };
 

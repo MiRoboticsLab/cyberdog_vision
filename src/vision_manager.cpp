@@ -668,22 +668,50 @@ void VisionManager::FaceManagerService(
 
   switch (request->command) {
     case FaceManagerT::Request::ADD_FACE:
-      response->result = addFaceInfo(request->username, request->ishost);
+      cout << "addFaceInfo: " << request->username << " is_host: " << request->ishost <<endl;
+      if (request->username.length() == 0) {
+        response->result =  -1;
+      }else{
+        FaceManager::getInstance()->addFaceIDCacheInfo(request->username, request->ishost);
+        face_detect_ = true;
+        std::thread faceDet = std::thread(&VisionManager::FaceDetProc, this, request->username);
+        faceDet.detach();
+        response->result = 0;
+      }
       break;
     case FaceManagerT::Request::CANCLE_ADD_FACE:
-      response->result = cancelAddFace();
+      cout << "cancelAddFace" << endl;
+      face_detect_ = false;
+      response->result = FaceManager::getInstance()->cancelAddFace();
       break;
     case FaceManagerT::Request::CONFIRM_LAST_FACE:
-      response->result = confirmFace(request->username, request->ishost);
+      cout << "confirmFace username:" << request->username << " is_host:" << request->ishost  << endl;
+      if (request->username.length() == 0) {
+        response->result = -1;
+      }else{
+        response->result = FaceManager::getInstance()->confirmFace(request->username, request->ishost);
+      }
       break;
     case FaceManagerT::Request::UPDATE_FACE_ID:
-      response->result = updateFaceId(request->username, request->oriname);
+      cout << "updateFaceId username:" << request->username << " ori_name:" << request->oriname  << endl;
+      if ( request->username.length() == 0 || request->oriname.length() == 0 ){
+        response->result = -1;
+      }else{
+        response->result = FaceManager::getInstance()->updateFaceId(request->oriname, request->username);
+      }
       break;
     case FaceManagerT::Request::DELETE_FACE:
-      response->result = deleteFace(request->username);
+      cout << "deleteFace username:" << request->username << endl;
+      if (request->username.length() == 0) {
+        response->result = -1;
+      }else{
+        response->result = FaceManager::getInstance()->deleteFace(request->username);
+      }
       break;
     case FaceManagerT::Request::GET_ALL_FACES:
-      response->result = getAllFaces(response);
+      response->msg = FaceManager::getInstance()->getAllFaces();
+      cout << "getAllFaces " << response->msg << endl;
+      response->result = 0;
       break;
     default:
       RCLCPP_ERROR(this->get_logger(), "service unsupport command %d", request->command);
@@ -739,7 +767,7 @@ void VisionManager::FaceDetProc(std::string face_name)
   int checkFacePose_ret;
   endlib_feats = FaceManager::getInstance()->getFeatures();
   std::time_t cur_time = std::time(NULL);
-  while (std::difftime(std::time(NULL), cur_time) < 40) {
+  while (std::difftime(std::time(NULL),cur_time) < 40 && face_detect_) {
     get_face_timeout = false;
     std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
     global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
@@ -751,14 +779,13 @@ void VisionManager::FaceDetProc(std::string face_name)
     face_ptr_->GetFaceInfo(mat_tmp, faces_info);
 #if 0
     // debug - visualization
-    if (faces_info.size() == 1) {
-      cv::rectangle(
-        mat_tmp,
-        cv::Rect(
-          faces_info[0].rect.left, faces_info[0].rect.top,
-          (faces_info[0].rect.right - faces_info[0].rect.left),
-          (faces_info[0].rect.bottom - faces_info[0].rect.top)),
-        cv::Scalar(0, 0, 255));
+    for(unsigned int i = 0; i < faces_info.size(); i++)
+    {
+      cv::rectangle(mat_tmp,
+         cv::Rect(faces_info[i].rect.left, faces_info[i].rect.top,
+         (faces_info[i].rect.right - faces_info[i].rect.left),
+         (faces_info[i].rect.bottom - faces_info[i].rect.top)),
+         cv::Scalar(0, 0, 255));
     }
     cv::imshow("face", mat_tmp);
     cv::waitKey(10);
@@ -784,64 +811,13 @@ void VisionManager::FaceDetProc(std::string face_name)
     }
     get_face_timeout = true;
   }
+
+  //cv::destroyAllWindows();
   /*it time out publish error*/
-  if (get_face_timeout) {
+  if(get_face_timeout &&  face_detect_) {
     checkFacePose_Msg = "timeout";
     publishFaceResult(3, face_name, mat_tmp, checkFacePose_Msg);
   }
-}
-
-int VisionManager::addFaceInfo(std::string & username, bool is_host)
-{
-  cout << "addFaceInfo: " << username << "is_host: " << is_host << endl;
-  if (username.length() == 0) {
-    return -1;
-  }
-  FaceManager::getInstance()->addFaceIDCacheInfo(username, is_host);
-  std::thread faceDet = std::thread(&VisionManager::FaceDetProc, this, username);
-  faceDet.detach();
-
-  return 0;
-}
-
-int VisionManager::cancelAddFace()
-{
-  cout << "cancelAddFace" << endl;
-  return FaceManager::getInstance()->cancelAddFace();
-}
-
-int VisionManager::confirmFace(std::string & username, bool is_host)
-{
-  cout << "confirmFace username:" << username << "is_host:" << is_host << endl;
-  if (username.length() == 0) {
-    return -1;
-  }
-
-  return FaceManager::getInstance()->confirmFace(username, is_host);
-}
-
-int VisionManager::updateFaceId(std::string & username, std::string & ori_name)
-{
-  cout << "updateFaceId username:" << username << "ori_name:" << ori_name << endl;
-  if (username.length() == 0 || ori_name.length() == 0) {
-    return -1;
-  }
-
-  return FaceManager::getInstance()->updateFaceId(ori_name, username);
-}
-
-int VisionManager::deleteFace(std::string & face_name)
-{
-  cout << "deleteFace username:" << face_name << endl;
-  return FaceManager::getInstance()->deleteFace(face_name);
-}
-
-int VisionManager::getAllFaces(std::shared_ptr<FaceManagerT::Response> response)
-{
-  std::string all_face_info = FaceManager::getInstance()->getAllFaces();
-  response->msg = all_face_info;
-  cout << "getAllFaces:" << all_face_info << endl;
-  return 0;
 }
 
 bool VisionManager::CallService(

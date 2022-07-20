@@ -120,6 +120,7 @@ bool FaceManager::loadFeatures()
   if (access(label_path, 0) != 0) {
     std::cout << "faces path not found." << std::endl;
     umask(0);
+    mkdir("/home/mi/.faces/", 0755);
     return true;
   }
 
@@ -176,17 +177,14 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::stri
     get_mean_stdev(m_faceStats[statsFaceNum].vector(), mean[statsFaceNum], stdev[statsFaceNum]);
     if (stdev[statsFaceNum] == FACE_NUMBER_STABLE_VAL) {
       if (mean[statsFaceNum] == 1.0f) {
-        //cout << "Nice, only 1 face!!" << endl;
       } else if (mean[statsFaceNum] == 0.0f) {
         msg = "No face found!!";
         return 7;
       } else {
-        //cout << "More than 1 face!!" << endl;
         msg = "More than 1 face found!!";
         return 8;
       }
     } else {
-      //cout << "Face number not stable!!" << endl;
       msg = "keep stable!!";
       return 9;
     }
@@ -202,12 +200,10 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::stri
       if (mean[statsFaceArea] > FACE_AREA_LEGAL_THRES) {
         //cout << "Nice, distance is OK!!" <<  mean[statsFaceArea] << endl;
       } else {
-        //cout << "Distance is NOT OK!! "<< endl;
         msg = "Distance is NOT OK!!";
         return 11;
       }
     } else {
-      //cout << "keep stable!!" << endl;
       msg = "keep stable!!";
       return 9;
     }
@@ -219,32 +215,41 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::stri
     m_faceStats[statsFaceRow].full())
   {
     get_mean_stdev(m_faceStats[statsFaceYaw].vector(), mean[statsFaceYaw], stdev[statsFaceYaw]);
-    get_mean_stdev(
-      m_faceStats[statsFacePitch].vector(), mean[statsFacePitch],
-      stdev[statsFacePitch]);
+    get_mean_stdev(m_faceStats[statsFacePitch].vector(), mean[statsFacePitch],stdev[statsFacePitch]);
     get_mean_stdev(m_faceStats[statsFaceRow].vector(), mean[statsFaceRow], stdev[statsFaceRow]);
     if (stdev[statsFaceYaw] < FACE_POSE_STABLE_THRES &&
       stdev[statsFacePitch] < FACE_POSE_STABLE_THRES &&
       stdev[statsFaceRow] < FACE_POSE_STABLE_THRES)
     {
-      if (abs(mean[statsFaceYaw]) < FACE_POSE_YAW_LEGAL_THRES &&
-        abs(mean[statsFacePitch]) < FACE_POSE_PITCH_LEGAL_THRES &&
-        abs(mean[statsFaceRow]) < FACE_POSE_ROW_LEGAL_THRES)
+      //cout << "yaw:" << mean[statsFaceYaw] << endl;
+      //cout << "pitch: " << mean[statsFacePitch] << endl;
+      //cout << "row: " << mean[statsFaceRow] << endl;
+      if (abs(mean[statsFaceYaw]) <= FACE_POSE_YAW_LEGAL_THRES &&
+        abs(mean[statsFacePitch]) <= FACE_POSE_PITCH_LEGAL_THRES &&
+        abs(mean[statsFaceRow]) <= FACE_POSE_ROW_LEGAL_THRES)
       {
-        cout << "Nice, degree is OK!!" << endl;
         msg = "check Face Pose success!!";
         return 0;
-      } else {
-        //printf("mean (%f, %f) (%f,%f) (%f,%f) \n",
-        //mean[1],FACE_POSE_YAW_LEGAL_THRES, mean[2],FACE_POSE_PITCH_LEGAL_THRES, mean[3],FACE_POSE_ROW_LEGAL_THRES);
-        //cout << "Degree is NOT OK!!" << endl;
+      }else if( mean[statsFaceYaw] > FACE_POSE_YAW_LEGAL_THRES ){
+        msg = "Degree is NOT OK: HEAD_LEFT!!";
+        return 12;
+      }else if(mean[statsFaceYaw] < -FACE_POSE_YAW_LEGAL_THRES){
+        msg = "Degree is NOT OK: HEAD_RIGHT!!";
+        return 13;
+      }else if( mean[statsFacePitch] > FACE_POSE_PITCH_LEGAL_THRES ){
+        msg = "Degree is NOT OK: HEAD_DOWN";
+        return 14;
+      }else if(mean[statsFacePitch] < -FACE_POSE_PITCH_LEGAL_THRES){
+        msg = "Degree is NOT OK: HEAD_UP!!";
+        return 15;
+      }else if(abs(mean[statsFaceRow]) > FACE_POSE_ROW_LEGAL_THRES){
+        msg = "Degree is NOT OK: HEAD_TILT !!";
+        return 16;
+      }else {
         msg = "Degree is NOT OK!!";
         return 10;
       }
     } else {
-      //printf("stable pose (%f, %f) (%f,%f) (%f,%f) \n",
-      //stdev[1],FACE_POSE_STABLE_THRES, stdev[2],FACE_POSE_STABLE_THRES, stdev[3],FACE_POSE_STABLE_THRES);
-      //cout << "Degree is not stable!!" << endl;
       msg = "keep stable!!";
       return 9;
     }
@@ -284,12 +289,7 @@ int FaceManager::confirmFace(std::string & name, bool is_host)
   std::cout << "confirm last face name: " << m_faceIdCached.name << " is_host: " <<
     m_faceIdCached.is_host << std::endl;
   if (m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host) {
-    std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name <<
-      std::endl;
-    return -1;
-  }
-  if (m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host) {
-    std::cout << "confirmFace face name: " << name << "but cache name:" << m_faceIdCached.name <<
+    std::cout << "confirmFace face name: " << name << " but cache name:" << m_faceIdCached.name <<
       std::endl;
     return -1;
   }
