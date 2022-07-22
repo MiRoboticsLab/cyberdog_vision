@@ -16,7 +16,7 @@
 #define CYBERDOG_VISION__SEMAPHORE_OP_HPP_
 
 #include <sys/sem.h>
-
+#include <errno.h>
 #include <iostream>
 
 #define IPCKEY_PATH "/"
@@ -64,16 +64,21 @@ inline int SetSemInitVal(int sem_set_id, int sem_index, int init_val)
   return 0;
 }
 
+inline int GetSemVal(int sem_set_id, int sem_index)
+{
+  return semctl(sem_set_id, sem_index, GETVAL, 0);
+}
+
 inline int WaitSem(int sem_set_id, int sem_index)
 {
   // std::cout << "Sem_P" << std::endl;
   struct sembuf sem_buf;
   sem_buf.sem_num = sem_index;
   sem_buf.sem_op = -1;
-  sem_buf.sem_flg = SEM_UNDO;
+  sem_buf.sem_flg = 0;
 
   if (semop(sem_set_id, &sem_buf, 1) < 0) {
-    std::cout << "Semaphore P operation fail. " << std::endl;
+    std::cout << "Semaphore P operation fail, error code: " << errno << std::endl;
     return -1;
   }
 
@@ -86,10 +91,10 @@ inline int SignalSem(int sem_set_id, int sem_index)
   struct sembuf sem_buf;
   sem_buf.sem_num = sem_index;
   sem_buf.sem_op = 1;
-  sem_buf.sem_flg = SEM_UNDO;
+  sem_buf.sem_flg = 0;
 
   if (semop(sem_set_id, &sem_buf, 1) < 0) {
-    std::cout << "Semaphore V operation fail. " << std::endl;
+    std::cout << "Semaphore V operation fail, error code: " << errno << std::endl;
     return -1;
   }
 
