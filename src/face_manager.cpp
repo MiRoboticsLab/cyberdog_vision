@@ -215,7 +215,9 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::stri
     m_faceStats[statsFaceRow].full())
   {
     get_mean_stdev(m_faceStats[statsFaceYaw].vector(), mean[statsFaceYaw], stdev[statsFaceYaw]);
-    get_mean_stdev(m_faceStats[statsFacePitch].vector(), mean[statsFacePitch],stdev[statsFacePitch]);
+    get_mean_stdev(
+      m_faceStats[statsFacePitch].vector(), mean[statsFacePitch],
+      stdev[statsFacePitch]);
     get_mean_stdev(m_faceStats[statsFaceRow].vector(), mean[statsFaceRow], stdev[statsFaceRow]);
     if (stdev[statsFaceYaw] < FACE_POSE_STABLE_THRES &&
       stdev[statsFacePitch] < FACE_POSE_STABLE_THRES &&
@@ -230,22 +232,22 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::stri
       {
         msg = "check Face Pose success!!";
         return 0;
-      }else if( mean[statsFaceYaw] > FACE_POSE_YAW_LEGAL_THRES ){
+      } else if (mean[statsFaceYaw] > FACE_POSE_YAW_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_LEFT!!";
         return 12;
-      }else if(mean[statsFaceYaw] < -FACE_POSE_YAW_LEGAL_THRES){
+      } else if (mean[statsFaceYaw] < -FACE_POSE_YAW_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_RIGHT!!";
         return 13;
-      }else if( mean[statsFacePitch] > FACE_POSE_PITCH_LEGAL_THRES ){
+      } else if (mean[statsFacePitch] > FACE_POSE_PITCH_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_DOWN";
         return 14;
-      }else if(mean[statsFacePitch] < -FACE_POSE_PITCH_LEGAL_THRES){
+      } else if (mean[statsFacePitch] < -FACE_POSE_PITCH_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_UP!!";
         return 15;
-      }else if(abs(mean[statsFaceRow]) > FACE_POSE_ROW_LEGAL_THRES){
+      } else if (abs(mean[statsFaceRow]) > FACE_POSE_ROW_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_TILT !!";
         return 16;
-      }else {
+      } else {
         msg = "Degree is NOT OK!!";
         return 10;
       }

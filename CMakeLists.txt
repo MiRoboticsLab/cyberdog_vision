@@ -14,7 +14,7 @@ set(THIRD_PARTY_URL https://cnbj2m-fds.api.xiaomi.net/bsp-internal/ROS/carpo-cam
 execute_process(
   COMMAND rm -rf ${CMAKE_SOURCE_DIR}/3rdparty
   COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/3rdparty
-  COMMAND wget -q ${THIRD_PARTY_URL} -P ${CMAKE_SOURCE_DIR}/3rdparty
+  COMMAND wget -d ${THIRD_PARTY_URL} -P ${CMAKE_SOURCE_DIR}/3rdparty
 )
 execute_process(
   COMMAND tar xvf ${CMAKE_SOURCE_DIR}/3rdparty/3rdparty.tar
