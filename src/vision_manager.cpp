@@ -197,7 +197,10 @@ void VisionManager::MainAlgoManager()
       algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
       {
         std::unique_lock<std::mutex> lk_result(result_mtx_);
+        algo_result_.header.stamp = rclcpp::Clock().now();
         person_pub_->publish(algo_result_);
+        PersonInfoT person_info;
+        algo_result_ = person_info;
       }
     }
   }
@@ -252,7 +255,10 @@ void VisionManager::DependAlgoManager()
       algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
       {
         std::unique_lock<std::mutex> lk_result(result_mtx_);
+        algo_result_.header.stamp = rclcpp::Clock().now();
         person_pub_->publish(algo_result_);
+        PersonInfoT person_info;
+        algo_result_ = person_info;
       }
     }
   }
@@ -346,11 +352,14 @@ void Convert(
     face.roi.y_offset = from[i].rect.top;
     face.roi.width = from[i].rect.right - from[i].rect.left;
     face.roi.height = from[i].rect.bottom - from[i].rect.top;
+    face.id = from[i].face_id;
     face.score = from[i].score;
     face.match = from[i].match_score;
     face.yaw = from[i].poses[0];
     face.pitch = from[i].poses[1];
     face.row = from[i].poses[2];
+    face.age = from[i].ages[0];
+    face.emotion = from[i].emotions[0];
     to.infos.push_back(face);
   }
 }
@@ -761,7 +770,6 @@ void VisionManager::publishFaceResult(
   }
 
 }
-
 
 void VisionManager::FaceDetProc(std::string face_name)
 {
