@@ -15,7 +15,12 @@
 #ifndef CYBERDOG_VISION__VISION_MANAGER_HPP_
 #define CYBERDOG_VISION__VISION_MANAGER_HPP_
 
-#include <opencv2/opencv.hpp>
+#include <string>
+#include <map>
+#include <vector>
+#include <memory>
+
+#include "opencv2/opencv.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "protocol/msg/body.hpp"
@@ -153,7 +158,6 @@ private:
   bool open_reid_;
   bool open_focus_;
   bool face_detect_;
-
 };
 
 }  // namespace cyberdog_vision

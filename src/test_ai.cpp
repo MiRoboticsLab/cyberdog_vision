@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
 #include <iostream>
-#include <string.h>
 #include <vector>
 
-#include <opencv2/opencv.hpp>
+#include "opencv2/opencv.hpp"
 
 #include "cyberdog_vision/body_detection.hpp"
 #include "cyberdog_vision/face_recognition.hpp"
@@ -24,26 +24,24 @@
 #include "cyberdog_vision/keypoints_detection.hpp"
 #include "cyberdog_vision/person_reid.hpp"
 
-const std::string kPathPrefix = "/home/mi/ros2_app/src/cyberdog_vision/3rdparty";
-
-using namespace cyberdog_vision;
+const char kPathPrefix[] = "/home/mi/ros2_app/src/cyberdog_vision/3rdparty";
 
 int test_body(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_body===" << std::endl;
-  BodyDetection body_ = BodyDetection(
-    kPathPrefix + "/body_gesture/model/detect.onnx",
-    kPathPrefix + "/body_gesture/model/cls_human_mid.onnx");
+  cyberdog_vision::BodyDetection body_ = cyberdog_vision::BodyDetection(
+    kPathPrefix + std::string("/body_gesture/model/detect.onnx"),
+    kPathPrefix + std::string("/body_gesture/model/cls_human_mid.onnx"));
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << file_names[i] << std::endl;
     cv::Mat img = cv::imread(file_names[i]);
-    BodyFrameInfo infos;
-    double tim1 = (double)cv::getTickCount();
+    cyberdog_vision::BodyFrameInfo infos;
+    double tim1 = static_cast<double>(cv::getTickCount());
     if (0 != body_.Detect(img, infos)) {
       return -1;
     }
-    double tim2 = (double)cv::getTickCount() - tim1;
+    double tim2 = static_cast<double>(cv::getTickCount()) - tim1;
     std::cout << "body detection time:" << float(tim2 / cv::getTickFrequency()) << std::endl;
     std::cout << "person num: " << infos.size() << std::endl;
     for (size_t j = 0; j < infos.size(); ++j) {
@@ -59,8 +57,8 @@ int test_body(const std::vector<cv::String> & file_names)
 int test_face(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_face===" << std::endl;
-  FaceRecognition face_ = FaceRecognition(
-    kPathPrefix + "/face_recognition", true, true);
+  cyberdog_vision::FaceRecognition face_ = cyberdog_vision::FaceRecognition(
+    kPathPrefix + std::string("/face_recognition"), true, true);
   std::cout << "Init complate. " << std::endl;
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
@@ -70,7 +68,7 @@ int test_face(const std::vector<cv::String> & file_names)
     if (0 != face_.GetFaceInfo(img, faces_info)) {
       return -1;
     }
-    for (auto & info: faces_info) {
+    for (auto & info : faces_info) {
       std::cout << "lmk: " << std::endl;
       for (auto & lmk : info.lmks) {
         std::cout << lmk << ", ";
@@ -99,25 +97,25 @@ int test_face(const std::vector<cv::String> & file_names)
 int test_gesture(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_gesture===" << std::endl;
-  BodyDetection body_ = BodyDetection(
-    kPathPrefix + "/body_gesture/model/detect.onnx",
-    kPathPrefix + "/body_gesture/model/cls_human_mid.onnx");
-  GestureRecognition gesture_ = GestureRecognition(
-    kPathPrefix + "/body_gesture/model/hand_detect_1118_FP16.plan",
-    kPathPrefix + "/body_gesture/model/hand_gesture_recognition_FP16.plan");
+  cyberdog_vision::BodyDetection body_ = cyberdog_vision::BodyDetection(
+    kPathPrefix + std::string("/body_gesture/model/detect.onnx"),
+    kPathPrefix + std::string("/body_gesture/model/cls_human_mid.onnx"));
+  cyberdog_vision::GestureRecognition gesture_ = cyberdog_vision::GestureRecognition(
+    kPathPrefix + std::string("/body_gesture/model/hand_detect_1118_FP16.plan"),
+    kPathPrefix + std::string("/body_gesture/model/hand_gesture_recognition_FP16.plan"));
 
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << file_names[i] << std::endl;
     cv::Mat img = cv::imread(file_names[i]);
     // Body detection
-    BodyFrameInfo bodies;
+    cyberdog_vision::BodyFrameInfo bodies;
     if (0 != body_.Detect(img, bodies)) {
       return -1;
     }
-    std::vector<InferBbox> infer_bboxes = BodyConvert(bodies);
+    std::vector<cyberdog_vision::InferBbox> infer_bboxes = cyberdog_vision::BodyConvert(bodies);
     // Gesture recognition
-    std::vector<GestureInfo> infos;
+    std::vector<cyberdog_vision::GestureInfo> infos;
     gesture_.GetGestureInfo(img, infer_bboxes, infos);
     std::cout << "Person num: " << infos.size() << std::endl;
     for (size_t i = 0; i < infos.size(); ++i) {
@@ -132,18 +130,18 @@ int test_gesture(const std::vector<cv::String> & file_names)
 int test_keypoints(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_keypoints===" << std::endl;
-  BodyDetection body_ = BodyDetection(
-    kPathPrefix + "/body_gesture/model/detect.onnx",
-    kPathPrefix + "/body_gesture/model/cls_human_mid.onnx");
-  KeypointsDetection keypoints_ = KeypointsDetection(
-    kPathPrefix + "/keypoints_detection/model/human_keyoint_256x192x17.plan");
+  cyberdog_vision::BodyDetection body_ = cyberdog_vision::BodyDetection(
+    kPathPrefix + std::string("/body_gesture/model/detect.onnx"),
+    kPathPrefix + std::string("/body_gesture/model/cls_human_mid.onnx"));
+  cyberdog_vision::KeypointsDetection keypoints_ = cyberdog_vision::KeypointsDetection(
+    kPathPrefix + std::string("/keypoints_detection/model/human_keyoint_256x192x17.plan"));
   std::cout << "Init complate. " << std::endl;
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << file_names[i] << std::endl;
     cv::Mat img = cv::imread(file_names[i]);
     // Body detection
-    BodyFrameInfo bodies;
+    cyberdog_vision::BodyFrameInfo bodies;
     if (0 != body_.Detect(img, bodies)) {
       return -1;
     }
@@ -151,11 +149,12 @@ int test_keypoints(const std::vector<cv::String> & file_names)
 
     // Get keypoints
     std::vector<std::vector<cv::Point2f>> bodies_keypoints;
-    std::vector<InferBbox> infer_bboxes = BodyConvert(bodies);
+    std::vector<cyberdog_vision::InferBbox> infer_bboxes = cyberdog_vision::BodyConvert(bodies);
     keypoints_.GetKeypointsInfo(img, infer_bboxes, bodies_keypoints);
-    for (auto & box: infer_bboxes) {
+    for (auto & box : infer_bboxes) {
       std::cout << box.body_box << std::endl;
     }
+
     for (size_t m = 0; m < bodies_keypoints.size(); ++m) {
       for (size_t n = 0; n < bodies_keypoints[m].size(); ++n) {
         std::cout << bodies_keypoints[m][n].x << ", " << bodies_keypoints[m][n].y << std::endl;
@@ -168,8 +167,8 @@ int test_keypoints(const std::vector<cv::String> & file_names)
 int test_reid(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_reid===" << std::endl;
-  PersonReID reid_ = PersonReID(
-    kPathPrefix + "/person_reid/model/reid_v1_mid.engine");
+  cyberdog_vision::PersonReID reid_ = cyberdog_vision::PersonReID(
+    kPathPrefix + std::string("/person_reid/model/reid_v1_mid.engine"));
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << i << " name: " << file_names[i] << std::endl;

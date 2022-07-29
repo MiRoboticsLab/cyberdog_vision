@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <memory>
 
-#include "cyberdog_vision/auto_focus.hpp"
+#include "cyberdog_vision/auto_track.hpp"
 #include "cyberdog_vision/common_type.hpp"
 
 namespace cyberdog_vision
@@ -58,4 +60,4 @@ void AutoTrack::SetLossTh(int loss_th)
 AutoTrack::~AutoTrack()
 {}
 
-} // namespace cyberdog_vision
+}  // namespace cyberdog_vision

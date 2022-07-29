@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <vector>
+#include <memory>
+
 #include "cyberdog_vision/gesture_recognition.hpp"
 
 namespace cyberdog_vision

@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <vector>
+
 #include "cyberdog_vision/person_reid.hpp"
 
 const int kFeatLen = 128;
@@ -82,7 +85,7 @@ int PersonReID::GetReIDInfo(
     id = tracking_id_;
     if (max_sim > feat_update_th_) {
       // Update library feat
-      if ((int)tracker_feat_.size() / kFeatLen == library_frame_num_) {
+      if (static_cast<int>(tracker_feat_.size()) / kFeatLen == library_frame_num_) {
         tracker_feat_.erase(tracker_feat_.begin(), tracker_feat_.begin() + kFeatLen);
       }
       tracker_feat_.insert(tracker_feat_.end(), match_feat.begin(), match_feat.end());

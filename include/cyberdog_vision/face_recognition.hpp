@@ -15,7 +15,10 @@
 #ifndef CYBERDOG_VISION__FACE_RECOGNITION_HPP_
 #define CYBERDOG_VISION__FACE_RECOGNITION_HPP_
 
+#include <string>
+#include <vector>
 #include <memory>
+#include <map>
 
 #include "XMFaceAPI.h"
 #include "common_type.hpp"
@@ -38,7 +41,6 @@ public:
 private:
   void FillParam(const std::string & model_path, FaceParam & param);
   XMFaceAPI * face_ptr_;
-
 };
 
 }  // namespace cyberdog_vision

@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <vector>
+#include <memory>
+
 #include "cyberdog_vision/keypoints_detection.hpp"
 
 namespace cyberdog_vision
@@ -30,7 +34,7 @@ void KeypointsDetection::GetKeypointsInfo(
   XMImage xm_img;
   ImgConvert(img, xm_img);
   std::vector<pbox> infer_bboxes;
-  for (auto & infer_bbox: body_boxes) {
+  for (auto & infer_bbox : body_boxes) {
     XMPoint point_tl = XMPoint(infer_bbox.body_box.x, infer_bbox.body_box.y);
     XMPoint point_br = XMPoint(
       infer_bbox.body_box.x + infer_bbox.body_box.width,
