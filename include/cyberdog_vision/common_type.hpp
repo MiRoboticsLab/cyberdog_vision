@@ -17,15 +17,15 @@
 
 #include <string>
 #include <mutex>
+#include <vector>
 #include <condition_variable>
 
-#include <opencv2/opencv.hpp>
+#include "opencv2/opencv.hpp"
 
-#include <std_msgs/msg/header.hpp>
+#include "std_msgs/msg/header.hpp"
 
 #include "XMFaceAPI.h"
 #include "ContentMotionAPI.h"
-#include "common_type.hpp"
 
 namespace cyberdog_vision
 {

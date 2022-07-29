@@ -15,6 +15,10 @@
 #ifndef CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
 #define CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
 
+#include <string>
+#include <vector>
+#include <memory>
+
 #include "person_keypoints.h"
 #include "common_type.hpp"
 
@@ -24,7 +28,7 @@ namespace cyberdog_vision
 class KeypointsDetection
 {
 public:
-  KeypointsDetection(const std::string & model_keypoints);
+  explicit KeypointsDetection(const std::string & model_keypoints);
   ~KeypointsDetection();
 
   void GetKeypointsInfo(

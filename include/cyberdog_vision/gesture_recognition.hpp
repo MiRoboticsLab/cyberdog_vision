@@ -15,6 +15,10 @@
 #ifndef CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
 #define CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
 
+#include <string>
+#include <vector>
+#include <memory>
+
 #include "hand_gesture.h"
 #include "common_type.hpp"
 

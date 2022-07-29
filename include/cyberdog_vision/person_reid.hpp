@@ -15,6 +15,9 @@
 #ifndef CYBERDOG_VISION__PERSON_REID_HPP_
 #define CYBERDOG_VISION__PERSON_REID_HPP_
 
+#include <string>
+#include <vector>
+
 #include "ReIDToolAPI.h"
 #include "common_type.hpp"
 
@@ -31,7 +34,7 @@ enum SimType
 class PersonReID
 {
 public:
-  PersonReID(const std::string & model_reid);
+  explicit PersonReID(const std::string & model_reid);
   ~PersonReID();
 
   int SetTracker(const cv::Mat & img, const cv::Rect & body_box, std::vector<float> & reid_feat);
@@ -58,7 +61,6 @@ private:
 
   void * reid_ptr_;
   std::vector<float> tracker_feat_;
-
 };
 
 }  // namespace cyberdog_vision

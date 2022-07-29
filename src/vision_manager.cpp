@@ -14,14 +14,21 @@
 
 #include <stdlib.h>
 
+#include <utility>
+#include <algorithm>
+#include <string>
+#include <vector>
+#include <memory>
+#include <map>
+
 #include "cyberdog_vision/vision_manager.hpp"
 #include "cyberdog_vision/semaphore_op.hpp"
 
 #define SHM_PROJ_ID 'A'
 #define SEM_PROJ_ID 'B'
 
-const std::string kModelPath = "/SDCARD/ros2_ws/src/cyberdog_vision/3rdparty";
-const std::string kLibraryPath = "/home/mi/.faces/faceinfo.yaml";
+const char kModelPath[] = "/SDCARD/ros2_ws/src/cyberdog_vision/3rdparty";
+const char kLibraryPath[] = "/home/mi/.faces/faceinfo.yaml";
 namespace cyberdog_vision
 {
 
@@ -50,7 +57,6 @@ VisionManager::VisionManager()
   reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
   gesture_thread_ = std::make_shared<std::thread>(&VisionManager::GestureRecognize, this);
   keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
-
 }
 
 int VisionManager::Init()
@@ -89,11 +95,16 @@ void VisionManager::CreateObject()
 {
   // Create AI object
   body_ptr_ = std::make_shared<BodyDetection>(
-    kModelPath + "/body_gesture/model/detect.onnx",
-    kModelPath + "/body_gesture/model/cls_human_mid.onnx");
+    kModelPath + std::string("/body_gesture/model/detect.onnx"),
+    kModelPath + std::string("/body_gesture/model/cls_human_mid.onnx"));
 
-  reid_ptr_ = std::make_shared<PersonReID>(kModelPath + "/person_reid/model/reid_v1_mid.engine");
-  face_ptr_ = std::make_shared<FaceRecognition>(kModelPath + "/face_recognition", true, true);
+  reid_ptr_ =
+    std::make_shared<PersonReID>(
+    kModelPath +
+    std::string("/person_reid/model/reid_v1_mid.engine"));
+  face_ptr_ = std::make_shared<FaceRecognition>(
+    kModelPath + std::string(
+      "/face_recognition"), true, true);
 
   // Create service server
   tracking_service_ = create_service<BodyRegionT>(
@@ -129,9 +140,9 @@ void VisionManager::ImageProc()
     WaitSem(sem_set_id_, 0);
     StampedImage simg;
     simg.img.create(480, 640, CV_8UC3);
-    memcpy(simg.img.data, (char *)shm_addr_ + sizeof(uint64_t), IMAGE_SIZE);
+    memcpy(simg.img.data, reinterpret_cast<char *>(shm_addr_) + sizeof(uint64_t), IMAGE_SIZE);
     uint64_t time;
-    memcpy(&time, (char *)shm_addr_, sizeof(uint64_t));
+    memcpy(&time, reinterpret_cast<char *>(shm_addr_), sizeof(uint64_t));
     simg.header.stamp.sec = time / 1000000000;
     simg.header.stamp.nanosec = time % 1000000000;
     SignalSem(sem_set_id_, 0);
@@ -411,7 +422,7 @@ void VisionManager::FocusTrack()
       std::cout << "===Activate focus thread. " << std::endl;
     }
 
-    // TODO: focus track and get result
+    // TODO(lff): focus track and get result
 
     // Storage foucs track result
     {
@@ -420,7 +431,7 @@ void VisionManager::FocusTrack()
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       algo_proc_.process_num--;
 
-      // TODO: Convert data to publish
+      // TODO(lff): Convert data to publish
 
       if (0 == algo_proc_.process_num) {
         algo_proc_.cond.notify_one();
@@ -478,7 +489,7 @@ void VisionManager::GestureRecognize()
       std::cout << "===Activate gesture recognition thread. " << std::endl;
     }
 
-    // TODO: gesture recognition and get result
+    // TODO(lff): gesture recognition and get result
 
     // Storage gesture recognition result
     {
@@ -486,7 +497,7 @@ void VisionManager::GestureRecognize()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       algo_proc_.process_num--;
-      // TODO: Convert data to publish
+      // TODO(lff): Convert data to publish
 
       if (0 == algo_proc_.process_num) {
         algo_proc_.cond.notify_one();
@@ -505,7 +516,7 @@ void VisionManager::KeypointsDet()
       std::cout << "===Activate keypoints detection thread. " << std::endl;
     }
 
-    // TODO: keypoints detection and get result
+    // TODO(lff): keypoints detection and get result
 
     // Storage keypoints detection result
     {
@@ -513,7 +524,7 @@ void VisionManager::KeypointsDet()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       algo_proc_.process_num--;
-      // TODO: Convert data to publish
+      // TODO(lff): Convert data to publish
 
       if (0 == algo_proc_.process_num) {
         algo_proc_.cond.notify_one();
@@ -524,7 +535,7 @@ void VisionManager::KeypointsDet()
 
 int VisionManager::LoadFaceLibrary(std::map<std::string, std::vector<float>> & library)
 {
-  cv::FileStorage fs(kLibraryPath, cv::FileStorage::READ);
+  cv::FileStorage fs(std::string(kLibraryPath), cv::FileStorage::READ);
   if (!fs.isOpened()) {
     RCLCPP_ERROR(get_logger(), "Open the face library file fail! ");
     return -1;
@@ -539,7 +550,7 @@ int VisionManager::LoadFaceLibrary(std::map<std::string, std::vector<float>> & l
     cv::FileNodeIterator jt = feat.begin();
     std::vector<float> face_feat;
     for (; jt != feat.end(); ++jt) {
-      face_feat.push_back((float)(*jt));
+      face_feat.push_back(static_cast<float>(*jt));
     }
     library.insert(std::pair<std::string, std::vector<float>>(name, face_feat));
   }
@@ -748,8 +759,8 @@ void VisionManager::publishFaceResult(
   if (result == 0) {
     std::vector<unsigned char> png_buff;
     std::vector<int> png_param = std::vector<int>(2);
-    png_param[0] = 16; //CV_IMWRITE_PNG_QUALITY;
-    png_param[1] = 3; //default(95)
+    png_param[0] = 16;  // CV_IMWRITE_PNG_QUALITY;
+    png_param[1] = 3;  // default(95)
 
     imencode(".png", img, png_buff, png_param);
     png_size = png_buff.size();
@@ -768,7 +779,6 @@ void VisionManager::publishFaceResult(
   } else {
     face_result_pub_->publish(std::move(face_result_msg));
   }
-
 }
 
 void VisionManager::FaceDetProc(std::string face_name)
@@ -806,11 +816,11 @@ void VisionManager::FaceDetProc(std::string face_name)
     cv::waitKey(10);
 #endif
     checkFacePose_ret = FaceManager::getInstance()->checkFacePose(faces_info, checkFacePose_Msg);
-    if (checkFacePose_ret == 0) { // check weather cur feature alrady in endlib
+    if (checkFacePose_ret == 0) {  // check weather cur feature alrady in endlib
 #if 0
       /*check if face feature already in endlib_feats*/
       face_ptr_->GetRecognitionResult(mat_tmp, endlib_feats, match_info);
-      //printf("match_info:match_score:%f\n",match_info[0].match_score);
+      // printf("match_info:match_score:%f\n",match_info[0].match_score);
       if (match_info.size() > 0 && match_info[0].match_score > 0.9) {
         publishFaceResult(-1, match_info[0].face_id, mat_tmp);
         RCLCPP_ERROR(this->get_logger(), "%s already in endlib\n", match_info[0].face_id.c_str());
@@ -827,7 +837,7 @@ void VisionManager::FaceDetProc(std::string face_name)
     get_face_timeout = true;
   }
 
-  //cv::destroyAllWindows();
+  // cv::destroyAllWindows();
   /*it time out publish error*/
   if (get_face_timeout && face_detect_) {
     checkFacePose_Msg = "timeout";
@@ -881,4 +891,4 @@ VisionManager::~VisionManager()
   }
 }
 
-}
+}  // namespace cyberdog_vision

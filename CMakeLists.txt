@@ -14,7 +14,7 @@ set(THIRD_PARTY_URL https://cnbj2m-fds.api.xiaomi.net/bsp-internal/ROS/carpo-cam
 execute_process(
   COMMAND rm -rf ${CMAKE_SOURCE_DIR}/3rdparty
   COMMAND mkdir -p ${CMAKE_SOURCE_DIR}/3rdparty
-  COMMAND wget -d ${THIRD_PARTY_URL} -P ${CMAKE_SOURCE_DIR}/3rdparty
+  COMMAND wget -q ${THIRD_PARTY_URL} -P ${CMAKE_SOURCE_DIR}/3rdparty
 )
 execute_process(
   COMMAND tar xvf ${CMAKE_SOURCE_DIR}/3rdparty/3rdparty.tar
@@ -32,12 +32,12 @@ find_package(rclcpp REQUIRED)
 find_package(protocol REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 find_package(CUDA REQUIRED)
-find_package(XmBody REQUIRED)
-find_package(XmFace REQUIRED)
-find_package(XmGesture REQUIRED)
-find_package(XmKeypoints REQUIRED)
-find_package(XmReID REQUIRED)
-find_package(XmTrack REQUIRED)
+find_package(XMBODY REQUIRED)
+find_package(XMFACE REQUIRED)
+find_package(XMGESTURE REQUIRED)
+find_package(XMKEYPOINTS REQUIRED)
+find_package(XMREID REQUIRED)
+find_package(XMTRACK REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -72,8 +72,8 @@ add_executable(test_ai
   src/person_reid.cpp
 )
 
-ament_target_dependencies(vision_manager rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID XmTrack)
-ament_target_dependencies(test_ai rclcpp protocol OpenCV CUDA XmBody XmFace XmGesture XmKeypoints XmReID XmTrack)
+ament_target_dependencies(vision_manager rclcpp protocol OpenCV CUDA XMBODY XMFACE XMGESTURE XMKEYPOINTS XMREID XMTRACK)
+ament_target_dependencies(test_ai rclcpp protocol OpenCV CUDA XMBODY XMFACE XMGESTURE XMKEYPOINTS XMREID XMTRACK)
 
 add_executable(client
   src/client.cpp

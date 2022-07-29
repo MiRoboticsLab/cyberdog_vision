@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <memory>
+
 #include "cyberdog_vision/body_detection.hpp"
 
 namespace cyberdog_vision

@@ -35,7 +35,6 @@ public:
 private:
   std::shared_ptr<ContentMotionAPI> body_ptr_;
   int gpu_id_;
-
 };
 
 }  // namespace cyberdog_vision

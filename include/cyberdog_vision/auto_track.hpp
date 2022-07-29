@@ -15,6 +15,9 @@
 #ifndef CYBERDOG_VISION__AUTO_TRACK_HPP_
 #define CYBERDOG_VISION__AUTO_TRACK_HPP_
 
+#include <string>
+#include <memory>
+
 #include "tracker.hpp"
 
 namespace cyberdog_vision
@@ -23,7 +26,7 @@ namespace cyberdog_vision
 class AutoTrack
 {
 public:
-  AutoTrack(const std::string & model_path);
+  explicit AutoTrack(const std::string & model_path);
   ~AutoTrack();
 
   int SetTracker(const cv::Mat & img, const cv::Rect & bbox);

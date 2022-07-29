@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <vector>
+#include <map>
+
 #include "cyberdog_vision/face_recognition.hpp"
 
 namespace cyberdog_vision
@@ -77,4 +81,4 @@ FaceRecognition::~FaceRecognition()
   }
 }
 
-}  // namespace cyberdog_vison
+}  // namespace cyberdog_vision

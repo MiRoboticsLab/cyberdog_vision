@@ -51,8 +51,8 @@ inline int CreateShm(unsigned char proj_id, size_t size, int & shm_id)
 
 inline char * GetShmAddr(int shm_id, size_t size)
 {
-  char * addr = (char *)shmat(shm_id, NULL, 0);
-  if (addr == (char *)-1) {
+  char * addr = reinterpret_cast<char *>(shmat(shm_id, NULL, 0));
+  if (addr == reinterpret_cast<char *>(-1)) {
     std::cout << "Get the shared memory addr fail. " << std::endl;
     return nullptr;
   }
