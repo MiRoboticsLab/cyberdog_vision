@@ -22,7 +22,7 @@ namespace cyberdog_vision
 {
 
 AutoTrack::AutoTrack(const std::string & model_path)
-: gpu_id_(0), loss_th_(300), fail_count_(0)
+: gpu_id_(0), loss_th_(300), fail_count_(0), is_init_(false)
 {
   std::string backbone_path = model_path + "/model/test_backbone.onnx";
   std::string head_path = model_path + "/model/test_rpn.onnx";
@@ -30,24 +30,39 @@ AutoTrack::AutoTrack(const std::string & model_path)
   tracker_ptr_ = std::make_shared<TRACKER::Tracker>(backbone_path, head_path, reid_path, gpu_id_);
 }
 
-int AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
+bool AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
 {
   XMImage xm_img;
   ImgConvert(img, xm_img);
   fail_count_ = 0;
-  return tracker_ptr_->init(xm_img, bbox);
+  bool is_success = tracker_ptr_->init(xm_img, bbox);
+  if (is_success) {
+    is_init_ = true;
+    std::cout << "set auto track success." << std::endl;
+  }
+  return is_success;
 }
 
 bool AutoTrack::Track(const cv::Mat & img, cv::Rect & bbox)
 {
+  if (!is_init_) {
+    std::cout << "Please set tracker before auto track. " << std::endl;
+    return false;
+  }
+
   XMImage xm_img;
   ImgConvert(img, xm_img);
   tracker_ptr_->track(xm_img);
-  TrackBox track_box = tracker_ptr_->getBox();
+  TRACKER::TrackBox track_box = tracker_ptr_->getBox();
   if (!track_box.track_sucess) {
     fail_count_++;
+    if (fail_count_ > loss_th_) {
+      std::cout << "Object lost, please set tracker to restart. " << std::endl;
+      is_init_ = false;
+    }
     return false;
   }
+  bbox = track_box.rect;
   fail_count_ = 0;
   return true;
 }

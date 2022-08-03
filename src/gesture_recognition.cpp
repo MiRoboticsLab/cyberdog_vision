@@ -21,17 +21,24 @@
 namespace cyberdog_vision
 {
 
-GestureRecognition::GestureRecognition(const std::string & model_det, const std::string & model_cls)
+GestureRecognition::GestureRecognition(const std::string & model_path)
 : max_person_num_(5)
 {
+  std::string model_det = model_path + "/model/hand_detect_1118_FP16.plan";
+  std::string model_cls = model_path + "/model/hand_gesture_recognition_FP16.plan";
   gesture_ptr_ = std::make_shared<handgesture::Hand_Gesture>(model_det, model_cls);
 }
 
-void GestureRecognition::GetGestureInfo(
+int GestureRecognition::GetGestureInfo(
   const cv::Mat & img,
   const std::vector<InferBbox> & body_boxes,
   std::vector<GestureInfo> & infos)
 {
+  if (body_boxes.empty()) {
+    std::cout << "Have no body to detect gesture. " << std::endl;
+    return -1;
+  }
+
   std::vector<handgesture::bbox> infer_bboxes;
   for (auto & body : body_boxes) {
     handgesture::bbox infer_bbox;
@@ -57,6 +64,7 @@ void GestureRecognition::GetGestureInfo(
     info.label = gesture_infos[i].gestureLabel;
     infos.push_back(info);
   }
+  return 0;
 }
 
 void GestureRecognition::SetRecognitionNum(int num)

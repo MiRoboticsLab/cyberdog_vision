@@ -27,6 +27,7 @@
 #include "protocol/msg/face.hpp"
 #include "protocol/msg/body_info.hpp"
 #include "protocol/msg/face_info.hpp"
+#include "protocol/msg/track_result.hpp"
 #include "protocol/msg/algo_list.hpp"
 #include "protocol/msg/person.hpp"
 #include "protocol/msg/face_result.hpp"
@@ -51,8 +52,10 @@ using BodyT = protocol::msg::Body;
 using BodyInfoT = protocol::msg::BodyInfo;
 using FaceT = protocol::msg::Face;
 using FaceInfoT = protocol::msg::FaceInfo;
+using KeypointT = protocol::msg::Keypoint;
 using AlgoListT = protocol::msg::AlgoList;
 using PersonInfoT = protocol::msg::Person;
+using TrackResultT = protocol::msg::TrackResult;
 using BodyRegionT = protocol::srv::BodyRegion;
 using CameraServiceT = protocol::srv::CameraService;
 using AlgoManagerT = protocol::srv::AlgoManager;
@@ -121,13 +124,16 @@ private:
   std::shared_ptr<std::thread> body_det_thread_;
   std::shared_ptr<std::thread> face_thread_;
   std::shared_ptr<std::thread> focus_thread_;
-  std::shared_ptr<std::thread> reid_thread_;
   std::shared_ptr<std::thread> gesture_thread_;
+  std::shared_ptr<std::thread> reid_thread_;
   std::shared_ptr<std::thread> keypoints_thread_;
 
   std::shared_ptr<BodyDetection> body_ptr_;
-  std::shared_ptr<PersonReID> reid_ptr_;
   std::shared_ptr<FaceRecognition> face_ptr_;
+  std::shared_ptr<AutoTrack> focus_ptr_;
+  std::shared_ptr<GestureRecognition> gesture_ptr_;
+  std::shared_ptr<PersonReID> reid_ptr_;
+  std::shared_ptr<KeypointsDetection> keypoints_ptr_;
 
   std::map<std::string, std::vector<float>> face_library_;
 
