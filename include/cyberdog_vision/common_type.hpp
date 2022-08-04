@@ -36,6 +36,11 @@ struct InferBbox
 {
   cv::Rect body_box;
   float score;
+  InferBbox()
+  {
+    body_box = cv::Rect(0, 0, 0, 0);
+    score = 0.f;
+  }
 };
 
 struct GestureInfo

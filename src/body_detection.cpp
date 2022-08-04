@@ -20,9 +20,11 @@
 namespace cyberdog_vision
 {
 
-BodyDetection::BodyDetection(const std::string & model_det, const std::string & model_cls)
+BodyDetection::BodyDetection(const std::string & model_path)
 : gpu_id_(0)
 {
+  std::string model_det = model_path + "/model/detect.onnx";
+  std::string model_cls = model_path + "/model/cls_human_mid.onnx";
   body_ptr_ = std::make_shared<ContentMotionAPI>();
   if (0 != body_ptr_->Init(model_det, "", model_cls, gpu_id_)) {
     throw std::logic_error("Init body detection algo fial. ");

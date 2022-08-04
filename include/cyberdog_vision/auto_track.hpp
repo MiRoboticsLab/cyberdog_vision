@@ -29,15 +29,17 @@ public:
   explicit AutoTrack(const std::string & model_path);
   ~AutoTrack();
 
-  int SetTracker(const cv::Mat & img, const cv::Rect & bbox);
+  bool SetTracker(const cv::Mat & img, const cv::Rect & bbox);
   bool Track(const cv::Mat & img, cv::Rect & bbox);
   void SetLossTh(int loss_th);
 
 private:
   std::shared_ptr<TRACKER::Tracker> tracker_ptr_;
+
   int gpu_id_;
   int loss_th_;
   int fail_count_;
+  bool is_init_;
 };
 
 }  // namespace cyberdog_vision

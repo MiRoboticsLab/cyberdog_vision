@@ -28,10 +28,10 @@ namespace cyberdog_vision
 class GestureRecognition
 {
 public:
-  GestureRecognition(const std::string & model_det, const std::string & model_cls);
+  explicit GestureRecognition(const std::string & model_path);
   ~GestureRecognition();
 
-  void GetGestureInfo(
+  int GetGestureInfo(
     const cv::Mat & img, const std::vector<InferBbox> & body_boxes,
     std::vector<GestureInfo> & infos);
 

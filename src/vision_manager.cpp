@@ -27,13 +27,14 @@
 #define SHM_PROJ_ID 'A'
 #define SEM_PROJ_ID 'B'
 
+const int kKeypointsNum = 17;
 const char kModelPath[] = "/SDCARD/ros2_ws/src/cyberdog_vision/3rdparty";
 const char kLibraryPath[] = "/home/mi/.faces/faceinfo.yaml";
 namespace cyberdog_vision
 {
 
 VisionManager::VisionManager()
-: Node("vision_manager"), shm_addr_(nullptr), buf_size_(6), is_tracking_(false),
+: Node("vision_manager"), shm_addr_(nullptr), buf_size_(6),
   open_face_(false), open_body_(false), open_gesture_(false), open_keypoints_(false),
   open_reid_(false), open_focus_(false)
 {
@@ -54,8 +55,8 @@ VisionManager::VisionManager()
   body_det_thread_ = std::make_shared<std::thread>(&VisionManager::BodyDet, this);
   face_thread_ = std::make_shared<std::thread>(&VisionManager::FaceRecognize, this);
   focus_thread_ = std::make_shared<std::thread>(&VisionManager::FocusTrack, this);
-  reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
   gesture_thread_ = std::make_shared<std::thread>(&VisionManager::GestureRecognize, this);
+  reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
   keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
 }
 
@@ -95,16 +96,25 @@ void VisionManager::CreateObject()
 {
   // Create AI object
   body_ptr_ = std::make_shared<BodyDetection>(
-    kModelPath + std::string("/body_gesture/model/detect.onnx"),
-    kModelPath + std::string("/body_gesture/model/cls_human_mid.onnx"));
+    kModelPath + std::string("/body_gesture"));
+
+  face_ptr_ = std::make_shared<FaceRecognition>(
+    kModelPath + std::string(
+      "/face_recognition"), true, true);
+
+  focus_ptr_ = std::make_shared<AutoTrack>(
+    kModelPath + std::string("/auto_track"));
+
+  gesture_ptr_ = std::make_shared<GestureRecognition>(
+    kModelPath + std::string("/body_gesture"));
 
   reid_ptr_ =
     std::make_shared<PersonReID>(
     kModelPath +
     std::string("/person_reid/model/reid_v1_mid.engine"));
-  face_ptr_ = std::make_shared<FaceRecognition>(
-    kModelPath + std::string(
-      "/face_recognition"), true, true);
+
+  keypoints_ptr_ = std::make_shared<KeypointsDetection>(
+    kModelPath + std::string("/keypoints_detection/model/human_keyoint_256x192x17.plan"));
 
   // Create service server
   tracking_service_ = create_service<BodyRegionT>(
@@ -320,7 +330,7 @@ void VisionManager::BodyDet()
         body_results_.is_filled = true;
         body_results_.cond.notify_one();
 
-        // debug - visualization
+        // TODO(lff) remove: Debug - visualization
         // std::cout << "Detection result: " << std::endl;
         // std::cout << "Person num: " << infos.size() << std::endl;
         // cv::Mat img_show = stamped_img.img.clone();
@@ -412,6 +422,16 @@ void VisionManager::FaceRecognize()
   }
 }
 
+void Convert(
+  const std_msgs::msg::Header & header, const cv::Rect & from, TrackResultT & to)
+{
+  to.header = header;
+  to.roi.x_offset = from.x;
+  to.roi.y_offset = from.y;
+  to.roi.width = from.width;
+  to.roi.height = from.height;
+}
+
 void VisionManager::FocusTrack()
 {
   while (rclcpp::ok()) {
@@ -422,7 +442,27 @@ void VisionManager::FocusTrack()
       std::cout << "===Activate focus thread. " << std::endl;
     }
 
-    // TODO(lff): focus track and get result
+    // Get image to proc
+    StampedImage stamped_img;
+    {
+      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+      stamped_img = global_img_buf_.img_buf.back();
+    }
+
+    // Focus track and get result
+    cv::Rect track_res;
+    bool is_success = focus_ptr_->Track(stamped_img.img, track_res);
+    if (!is_success) {
+      RCLCPP_WARN(get_logger(), "Auto track fail. ");
+    }
+
+    // TODO(lff) remove: Debug - visualization
+    // if (is_success) {
+    //   cv::Mat img_show = stamped_img.img.clone();
+    //   cv::rectangle(img_show, track_res, cv::Scalar(0, 0, 255));
+    //   cv::imshow("Track", img_show);
+    //   cv::waitKey(10);
+    // }
 
     // Storage foucs track result
     {
@@ -430,9 +470,10 @@ void VisionManager::FocusTrack()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       algo_proc_.process_num--;
-
-      // TODO(lff): Convert data to publish
-
+      //  Convert data to publish
+      if (is_success) {
+        Convert(stamped_img.header, track_res, algo_result_.track_res);
+      }
       if (0 == algo_proc_.process_num) {
         algo_proc_.cond.notify_one();
       }
@@ -449,17 +490,20 @@ void VisionManager::ReIDProc()
       std::unique_lock<std::mutex> lk_reid(reid_struct_.mtx);
       reid_struct_.cond.wait(lk_reid, [this] {return reid_struct_.is_called;});
       reid_struct_.is_called = false;
+      std::cout << "===Activate reid thread. " << std::endl;
+    }
+
+    // ReID and get result
+    {
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
+      std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
+      if (-1 !=
+        reid_ptr_->GetReIDInfo(
+          body_results_.detection_img.img, body_bboxes, person_id,
+          person_index) &&
+        -1 != person_id)
       {
-        std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
-        std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
-        if (-1 !=
-          reid_ptr_->GetReIDInfo(
-            body_results_.detection_img.img, body_bboxes, person_id,
-            person_index) &&
-          -1 != person_id)
-        {
-          RCLCPP_INFO(get_logger(), "Reid result, person id: %d", person_id);
-        }
+        RCLCPP_INFO(get_logger(), "Reid result, person id: %d", person_id);
       }
     }
 
@@ -479,6 +523,17 @@ void VisionManager::ReIDProc()
   }
 }
 
+void Convert(const std::vector<GestureInfo> & from, BodyInfoT & to)
+{
+  for (size_t i = 0; i < from.size(); ++i) {
+    to.infos[i].gesture.roi.x_offset = from[i].rect.x;
+    to.infos[i].gesture.roi.y_offset = from[i].rect.y;
+    to.infos[i].gesture.roi.width = from[i].rect.width;
+    to.infos[i].gesture.roi.height = from[i].rect.height;
+    to.infos[i].gesture.cls = from[i].label;
+  }
+}
+
 void VisionManager::GestureRecognize()
 {
   while (rclcpp::ok()) {
@@ -489,7 +544,30 @@ void VisionManager::GestureRecognize()
       std::cout << "===Activate gesture recognition thread. " << std::endl;
     }
 
-    // TODO(lff): gesture recognition and get result
+    // Gesture recognition and get result
+    bool is_success = false;
+    std::vector<GestureInfo> infos;
+    {
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
+      std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
+      if (-1 != gesture_ptr_->GetGestureInfo(body_results_.detection_img.img, body_bboxes, infos)) {
+        is_success = true;
+      }
+    }
+
+    // TODO(lff) remove: Debug - visual
+    // if (is_success) {
+    //   cv::Mat img_show = body_results_.detection_img.img.clone();
+    //   for (size_t i = 0; i < infos.size(); ++i) {
+    //     cv::rectangle(img_show, infos[i].rect, cv::Scalar(0, 0, 255));
+    //     cv::putText(
+    //       img_show, std::to_string(infos[i].label),
+    //       cv::Point(infos[i].rect.x, infos[i].rect.y), cv::FONT_HERSHEY_COMPLEX, 1.0,
+    //       cv::Scalar(0, 0, 255));
+    //     cv::imshow("gesture", img_show);
+    //     cv::waitKey(10);
+    //   }
+    // }
 
     // Storage gesture recognition result
     {
@@ -497,11 +575,26 @@ void VisionManager::GestureRecognize()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       algo_proc_.process_num--;
-      // TODO(lff): Convert data to publish
-
+      // Convert data to publish
+      if (is_success) {
+        Convert(infos, algo_result_.body_info);
+      }
       if (0 == algo_proc_.process_num) {
         algo_proc_.cond.notify_one();
       }
+    }
+  }
+}
+
+void Convert(const std::vector<std::vector<cv::Point2f>> & from, BodyInfoT & to)
+{
+  for (size_t i = 0; i < from.size(); ++i) {
+    to.infos[i].keypoints.resize(kKeypointsNum * sizeof(cv::Point2f));
+    for (size_t num = 0; num < from[i].size(); ++num) {
+      KeypointT keypoint;
+      keypoint.x = from[i][num].x;
+      keypoint.y = from[i][num].y;
+      to.infos[i].keypoints.push_back(keypoint);
     }
   }
 }
@@ -516,7 +609,25 @@ void VisionManager::KeypointsDet()
       std::cout << "===Activate keypoints detection thread. " << std::endl;
     }
 
-    // TODO(lff): keypoints detection and get result
+    // Keypoints detection and get result
+    std::vector<std::vector<cv::Point2f>> bodies_keypoints;
+    {
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
+      std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
+      keypoints_ptr_->GetKeypointsInfo(
+        body_results_.detection_img.img, body_bboxes,
+        bodies_keypoints);
+    }
+
+    // TODO(lff) remove: Debug - visual
+    // cv::Mat img_show = body_results_.detection_img.img.clone();
+    // for (size_t i = 0; i < bodies_keypoints.size(); ++i) {
+    //   for (size_t j = 0; j < bodies_keypoints[i].size(); ++j) {
+    //     cv::circle(img_show, bodies_keypoints[i][j], 1, cv::Scalar(0, 0, 255), cv::LINE_8);
+    //   }
+    // }
+    // cv::imshow("keypoints", img_show);
+    // cv::waitKey(10);
 
     // Storage keypoints detection result
     {
@@ -524,8 +635,8 @@ void VisionManager::KeypointsDet()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       algo_proc_.process_num--;
-      // TODO(lff): Convert data to publish
-
+      // Convert data to publish
+      Convert(bodies_keypoints, algo_result_.body_info);
       if (0 == algo_proc_.process_num) {
         algo_proc_.cond.notify_one();
       }
@@ -601,13 +712,13 @@ int VisionManager::GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi)
     }
   }
   if (is_found) {
-    is_tracking_ = true;
     std::vector<float> reid_feat;
     if (0 != reid_ptr_->SetTracker(track_img, track_rect, reid_feat)) {
-      RCLCPP_WARN(get_logger(), "Set tracker fail. ");
+      RCLCPP_WARN(get_logger(), "Set reid tracker fail. ");
       return -1;
     }
   } else {
+    RCLCPP_WARN(get_logger(), "Can not find match body. ");
     return -1;
   }
   return 0;
@@ -651,11 +762,30 @@ void VisionManager::TrackingService(
   RCLCPP_INFO(
     this->get_logger(), "Received tracking object from app: %d, %d, %d, %d",
     req->roi.x_offset, req->roi.y_offset, req->roi.width, req->roi.height);
-  std::unique_lock<std::mutex> lk(body_results_.mtx);
-  if (0 != GetMatchBody(req->roi)) {
-    res->success = false;
-  } else {
-    res->success = true;
+
+  if (open_reid_) {
+    std::unique_lock<std::mutex> lk(body_results_.mtx);
+    if (0 != GetMatchBody(req->roi)) {
+      res->success = false;
+    } else {
+      res->success = true;
+    }
+  }
+
+  // TODO(lff): Wait for image and rect from app
+  if (open_focus_) {
+    StampedImage stamped_img;
+    {
+      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+      stamped_img = global_img_buf_.img_buf.back();
+    }
+    cv::Rect rect = cv::Rect(req->roi.x_offset, req->roi.y_offset, req->roi.width, req->roi.height);
+    if (!focus_ptr_->SetTracker(stamped_img.img, rect)) {
+      RCLCPP_WARN(get_logger(), "Set focus tracker fail. ");
+      res->success = false;
+    } else {
+      res->success = true;
+    }
   }
 }
 

@@ -27,7 +27,7 @@ namespace cyberdog_vision
 class BodyDetection
 {
 public:
-  BodyDetection(const std::string & model_det, const std::string & model_cls);
+  explicit BodyDetection(const std::string & model_path);
   ~BodyDetection();
 
   int Detect(const cv::Mat & img, BodyFrameInfo & infos);
