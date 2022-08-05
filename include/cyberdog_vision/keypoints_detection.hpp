@@ -28,7 +28,7 @@ namespace cyberdog_vision
 class KeypointsDetection
 {
 public:
-  explicit KeypointsDetection(const std::string & model_keypoints);
+  explicit KeypointsDetection(const std::string & model_path);
   ~KeypointsDetection();
 
   void GetKeypointsInfo(

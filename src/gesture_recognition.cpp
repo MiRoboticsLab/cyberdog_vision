@@ -24,8 +24,9 @@ namespace cyberdog_vision
 GestureRecognition::GestureRecognition(const std::string & model_path)
 : max_person_num_(5)
 {
-  std::string model_det = model_path + "/model/hand_detect_1118_FP16.plan";
-  std::string model_cls = model_path + "/model/hand_gesture_recognition_FP16.plan";
+  std::cout << "===Init GestureRecognition===" << std::endl;
+  std::string model_det = model_path + "/hand_detect_1118_FP16.plan";
+  std::string model_cls = model_path + "/hand_gesture_recognition_FP16.plan";
   gesture_ptr_ = std::make_shared<handgesture::Hand_Gesture>(model_det, model_cls);
 }
 

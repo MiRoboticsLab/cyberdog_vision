@@ -24,7 +24,7 @@
 #include "cyberdog_vision/keypoints_detection.hpp"
 #include "cyberdog_vision/person_reid.hpp"
 
-const char kPathPrefix[] = "/home/mi/ros2_app/src/cyberdog_vision/3rdparty";
+const char kPathPrefix[] = "/SDCARD/vision";
 
 int test_body(const std::vector<cv::String> & file_names)
 {
@@ -130,7 +130,7 @@ int test_keypoints(const std::vector<cv::String> & file_names)
   cyberdog_vision::BodyDetection body_ = cyberdog_vision::BodyDetection(
     kPathPrefix + std::string("/body_gesture"));
   cyberdog_vision::KeypointsDetection keypoints_ = cyberdog_vision::KeypointsDetection(
-    kPathPrefix + std::string("/keypoints_detection/model/human_keyoint_256x192x17.plan"));
+    kPathPrefix + std::string("/keypoints_detection"));
   std::cout << "Init complate. " << std::endl;
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
@@ -164,7 +164,7 @@ int test_reid(const std::vector<cv::String> & file_names)
 {
   std::cout << "===test_reid===" << std::endl;
   cyberdog_vision::PersonReID reid_ = cyberdog_vision::PersonReID(
-    kPathPrefix + std::string("/person_reid/model/reid_v1_mid.engine"));
+    kPathPrefix + std::string("/person_reid"));
   for (size_t i = 0; i < file_names.size(); i++) {
     // For every image
     std::cout << i << " name: " << file_names[i] << std::endl;
