@@ -28,7 +28,7 @@
 #define SEM_PROJ_ID 'B'
 
 const int kKeypointsNum = 17;
-const char kModelPath[] = "/SDCARD/ros2_ws/src/cyberdog_vision/3rdparty";
+const char kModelPath[] = "/SDCARD/vision";
 const char kLibraryPath[] = "/home/mi/.faces/faceinfo.yaml";
 namespace cyberdog_vision
 {
@@ -111,10 +111,10 @@ void VisionManager::CreateObject()
   reid_ptr_ =
     std::make_shared<PersonReID>(
     kModelPath +
-    std::string("/person_reid/model/reid_v1_mid.engine"));
+    std::string("/person_reid"));
 
   keypoints_ptr_ = std::make_shared<KeypointsDetection>(
-    kModelPath + std::string("/keypoints_detection/model/human_keyoint_256x192x17.plan"));
+    kModelPath + std::string("/keypoints_detection"));
 
   // Create service server
   tracking_service_ = create_service<BodyRegionT>(

@@ -21,8 +21,10 @@
 namespace cyberdog_vision
 {
 
-KeypointsDetection::KeypointsDetection(const std::string & model_keypoints)
+KeypointsDetection::KeypointsDetection(const std::string & model_path)
 {
+  std::cout << "===Init KeypointsDetection===" << std::endl;
+  std::string model_keypoints = model_path + "/human_keyoint_256x192x17.plan";
   keypoints_ptr_ = std::make_shared<Person_keyPoints>(model_keypoints);
 }
 

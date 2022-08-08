@@ -21,10 +21,12 @@ const int kFeatLen = 128;
 namespace cyberdog_vision
 {
 
-PersonReID::PersonReID(const std::string & model_reid)
+PersonReID::PersonReID(const std::string & model_path)
 : gpu_id_(0), tracking_id_(0), object_loss_th_(300), library_frame_num_(15), unmatch_count_(0),
   feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), reid_ptr_(nullptr)
 {
+  std::cout << "===Init PersonReID===" << std::endl;
+  std::string model_reid = model_path + "/reid_v1_mid.engine";
   if (0 != REID_Init(reid_ptr_, model_reid.c_str(), gpu_id_)) {
     throw std::logic_error("Init person reid algo fial. ");
   }

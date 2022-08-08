@@ -34,7 +34,7 @@ enum SimType
 class PersonReID
 {
 public:
-  explicit PersonReID(const std::string & model_reid);
+  explicit PersonReID(const std::string & model_path);
   ~PersonReID();
 
   int SetTracker(const cv::Mat & img, const cv::Rect & body_box, std::vector<float> & reid_feat);

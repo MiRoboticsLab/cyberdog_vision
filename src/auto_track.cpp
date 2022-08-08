@@ -24,9 +24,10 @@ namespace cyberdog_vision
 AutoTrack::AutoTrack(const std::string & model_path)
 : gpu_id_(0), loss_th_(300), fail_count_(0), is_init_(false)
 {
-  std::string backbone_path = model_path + "/model/test_backbone.onnx";
-  std::string head_path = model_path + "/model/test_rpn.onnx";
-  std::string reid_path = model_path + "/model/any_reid_v2_sim.onnx";
+  std::cout << "===Init AutoTrack===" << std::endl;
+  std::string backbone_path = model_path + "/test_backbone.onnx";
+  std::string head_path = model_path + "/test_rpn.onnx";
+  std::string reid_path = model_path + "/any_reid_v2_sim.onnx";
   tracker_ptr_ = std::make_shared<TRACKER::Tracker>(backbone_path, head_path, reid_path, gpu_id_);
 }
 
