@@ -47,6 +47,11 @@ struct GestureInfo
 {
   cv::Rect rect;
   int label;
+  GestureInfo()
+  {
+    rect = cv::Rect(0, 0, 0, 0);
+    label = 9;
+  }
 };
 
 struct StampedImage
