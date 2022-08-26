@@ -34,18 +34,70 @@ namespace cyberdog_vision
 {
 
 VisionManager::VisionManager()
-: Node("vision_manager"), shm_addr_(nullptr), buf_size_(6),
+: nav2_util::LifecycleNode("vision_manager"), shm_addr_(nullptr), buf_size_(6),
   open_face_(false), open_body_(false), open_gesture_(false), open_keypoints_(false),
-  open_reid_(false), open_focus_(false)
+  open_reid_(false), open_focus_(false), is_activate_(false)
 {
+  setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+}
+
+nav2_util::CallbackReturn VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
+{
+  RCLCPP_INFO(get_logger(), "Configuring vision_manager. ");
   if (0 != Init()) {
-    throw std::logic_error("Init shared memory or semaphore fail. ");
+    return nav2_util::CallbackReturn::FAILURE;
+  }
+  return nav2_util::CallbackReturn::SUCCESS;
+}
+
+nav2_util::CallbackReturn VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
+{
+  RCLCPP_INFO(get_logger(), "Activating vision_manager. ");
+  is_activate_ = true;
+  person_pub_->on_activate();
+  face_result_pub_->on_activate();
+  return nav2_util::CallbackReturn::SUCCESS;
+}
+
+nav2_util::CallbackReturn VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
+{
+  RCLCPP_INFO(get_logger(), "Deactivating vision_manager. ");
+  is_activate_ = false;
+  person_pub_->on_deactivate();
+  face_result_pub_->on_deactivate();
+  return nav2_util::CallbackReturn::SUCCESS;
+}
+
+nav2_util::CallbackReturn VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
+{
+  RCLCPP_INFO(get_logger(), "Cleaning up vision_manager. ");
+  person_pub_.reset();
+  face_result_pub_.reset();
+  tracking_service_.reset();
+  algo_manager_service_.reset();
+  facemanager_service_.reset();
+  camera_clinet_.reset();
+  return nav2_util::CallbackReturn::SUCCESS;
+}
+
+nav2_util::CallbackReturn VisionManager::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
+{
+  RCLCPP_INFO(get_logger(), "Shutting down vision_manager. ");
+  return nav2_util::CallbackReturn::SUCCESS;
+}
+
+int VisionManager::Init()
+{
+  if (0 != InitIPC()) {
+    RCLCPP_ERROR(get_logger(), "Init shared memory or semaphore fail. ");
+    return -1;
   }
 
   // Create object
   CreateObject();
   if (!CallService(camera_clinet_, 0, "face-interval=1")) {
-    throw std::logic_error("Start camera stream fail. ");
+    RCLCPP_ERROR(get_logger(), "Start camera stream fail. ");
+    return -1;
   }
 
   // Create process thread
@@ -58,9 +110,11 @@ VisionManager::VisionManager()
   gesture_thread_ = std::make_shared<std::thread>(&VisionManager::GestureRecognize, this);
   reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
   keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
+
+  return 0;
 }
 
-int VisionManager::Init()
+int VisionManager::InitIPC()
 {
   // Create shared memory and get address
   if (0 != CreateShm(SHM_PROJ_ID, sizeof(uint64_t) + IMAGE_SIZE, shm_id_)) {
@@ -146,25 +200,27 @@ void VisionManager::CreateObject()
 void VisionManager::ImageProc()
 {
   while (rclcpp::ok()) {
-    WaitSem(sem_set_id_, 2);
-    WaitSem(sem_set_id_, 0);
-    StampedImage simg;
-    simg.img.create(480, 640, CV_8UC3);
-    memcpy(simg.img.data, reinterpret_cast<char *>(shm_addr_) + sizeof(uint64_t), IMAGE_SIZE);
-    uint64_t time;
-    memcpy(&time, reinterpret_cast<char *>(shm_addr_), sizeof(uint64_t));
-    simg.header.stamp.sec = time / 1000000000;
-    simg.header.stamp.nanosec = time % 1000000000;
-    SignalSem(sem_set_id_, 0);
-    SignalSem(sem_set_id_, 1);
+    if (is_activate_) {
+      WaitSem(sem_set_id_, 2);
+      WaitSem(sem_set_id_, 0);
+      StampedImage simg;
+      simg.img.create(480, 640, CV_8UC3);
+      memcpy(simg.img.data, reinterpret_cast<char *>(shm_addr_) + sizeof(uint64_t), IMAGE_SIZE);
+      uint64_t time;
+      memcpy(&time, reinterpret_cast<char *>(shm_addr_), sizeof(uint64_t));
+      simg.header.stamp.sec = time / 1000000000;
+      simg.header.stamp.nanosec = time % 1000000000;
+      SignalSem(sem_set_id_, 0);
+      SignalSem(sem_set_id_, 1);
 
-    // Save image to buffer, only process with real img
-    {
-      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
-      global_img_buf_.img_buf.clear();
-      global_img_buf_.img_buf.push_back(simg);
-      global_img_buf_.is_filled = true;
-      global_img_buf_.cond.notify_one();
+      // Save image to buffer, only process with real img
+      {
+        std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+        global_img_buf_.img_buf.clear();
+        global_img_buf_.img_buf.push_back(simg);
+        global_img_buf_.is_filled = true;
+        global_img_buf_.cond.notify_one();
+      }
     }
   }
 }
@@ -405,7 +461,7 @@ void VisionManager::FaceRecognize()
     // Face recognition and get result
     std::vector<MatchFaceInfo> result;
     if (0 != face_ptr_->GetRecognitionResult(stamped_img.img, face_library_, result)) {
-      RCLCPP_WARN(this->get_logger(), "Face recognition fail. ");
+      RCLCPP_WARN(get_logger(), "Face recognition fail. ");
     }
 
     // Storage face recognition result
@@ -760,7 +816,7 @@ void VisionManager::TrackingService(
   std::shared_ptr<BodyRegionT::Response> res)
 {
   RCLCPP_INFO(
-    this->get_logger(), "Received tracking object from app: %d, %d, %d, %d",
+    get_logger(), "Received tracking object from app: %d, %d, %d, %d",
     req->roi.x_offset, req->roi.y_offset, req->roi.width, req->roi.height);
 
   if (open_reid_) {
@@ -794,7 +850,7 @@ void VisionManager::AlgoManagerService(
   const std::shared_ptr<AlgoManagerT::Request> req,
   std::shared_ptr<AlgoManagerT::Response> res)
 {
-  RCLCPP_INFO(this->get_logger(), "Received algo request. ");
+  RCLCPP_INFO(get_logger(), "Received algo request. ");
   std::cout << "Algo enable: " << std::endl;
   for (size_t i = 0; i < req->algo_enable.size(); ++i) {
     SetAlgoState(req->algo_enable[i], true);
@@ -813,7 +869,7 @@ void VisionManager::FaceManagerService(
   std::shared_ptr<FaceManagerT::Response> response)
 {
   RCLCPP_INFO(
-    this->get_logger(), "face service received command %d, argument '%s'",
+    get_logger(), "face service received command %d, argument '%s'",
     request->command, request->args.c_str());
 
   switch (request->command) {
@@ -870,7 +926,7 @@ void VisionManager::FaceManagerService(
       response->result = 0;
       break;
     default:
-      RCLCPP_ERROR(this->get_logger(), "service unsupport command %d", request->command);
+      RCLCPP_ERROR(get_logger(), "service unsupport command %d", request->command);
       response->result = FaceManagerT::Response::RESULT_INVALID_ARGS;
   }
 }
@@ -953,7 +1009,7 @@ void VisionManager::FaceDetProc(std::string face_name)
       // printf("match_info:match_score:%f\n",match_info[0].match_score);
       if (match_info.size() > 0 && match_info[0].match_score > 0.9) {
         publishFaceResult(-1, match_info[0].face_id, mat_tmp);
-        RCLCPP_ERROR(this->get_logger(), "%s already in endlib\n", match_info[0].face_id.c_str());
+        RCLCPP_ERROR(get_logger(), "%s already in endlib\n", match_info[0].face_id.c_str());
         break;
       }
 #endif
@@ -986,10 +1042,10 @@ bool VisionManager::CallService(
   std::chrono::nanoseconds timeout = std::chrono::nanoseconds(-1);
   while (!client->wait_for_service(timeout)) {
     if (!rclcpp::ok()) {
-      RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service. Exiting.");
+      RCLCPP_ERROR(get_logger(), "Interrupted while waiting for the service. Exiting.");
       return false;
     }
-    RCLCPP_INFO(this->get_logger(), "Service not available, waiting again...");
+    RCLCPP_INFO(get_logger(), "Service not available, waiting again...");
   }
 
   auto client_cb = [timeout](rclcpp::Client<CameraServiceT>::SharedFuture future) {

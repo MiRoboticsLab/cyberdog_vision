@@ -45,6 +45,8 @@
 #include "cyberdog_vision/auto_track.hpp"
 #include "cyberdog_vision/face_manager.hpp"
 
+#include "nav2_util/lifecycle_node.hpp"
+
 namespace cyberdog_vision
 {
 
@@ -63,14 +65,22 @@ using FaceManagerT = protocol::srv::FaceManager;
 using FaceResultT = protocol::msg::FaceResult;
 
 
-class VisionManager : public rclcpp::Node
+class VisionManager : public nav2_util::LifecycleNode
 {
 public:
   VisionManager();
   ~VisionManager();
 
+protected:
+  nav2_util::CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
+  nav2_util::CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override;
+  nav2_util::CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override;
+  nav2_util::CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
+  nav2_util::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override;
+
 private:
   int Init();
+  int InitIPC();
   void CreateObject();
   void ImageProc();
   void MainAlgoManager();
@@ -114,9 +124,9 @@ private:
   rclcpp::Service<BodyRegionT>::SharedPtr tracking_service_;
   rclcpp::Service<AlgoManagerT>::SharedPtr algo_manager_service_;
   rclcpp::Service<FaceManagerT>::SharedPtr facemanager_service_;
-  rclcpp::Publisher<PersonInfoT>::SharedPtr person_pub_;
-  rclcpp::Publisher<FaceResultT>::SharedPtr face_result_pub_;
   rclcpp::Client<CameraServiceT>::SharedPtr camera_clinet_;
+  rclcpp_lifecycle::LifecyclePublisher<PersonInfoT>::SharedPtr person_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<FaceResultT>::SharedPtr face_result_pub_;
 
   std::shared_ptr<std::thread> img_proc_thread_;
   std::shared_ptr<std::thread> main_manager_thread_;
@@ -156,13 +166,13 @@ private:
   char * shm_addr_;
 
   size_t buf_size_;
-  bool is_tracking_;
   bool open_face_;
   bool open_body_;
   bool open_gesture_;
   bool open_keypoints_;
   bool open_reid_;
   bool open_focus_;
+  bool is_activate_;
   bool face_detect_;
 };
 
