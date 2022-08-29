@@ -69,8 +69,8 @@ int FaceRecognition::GetRecognitionResult(
 void FaceRecognition::FillParam(const std::string & model_path, FaceParam & param)
 {
   param.detect_mf = model_path + "/detect/mnetv2_gray_nop_light_epoch_235_512.onnx";
-  param.lmk_mf = model_path + "/landmark/pfldd.onnx";
-  param.feat_mf = model_path + "/feature/mask_mfn_v5_1_nobn.onnx";
+  param.lmk_mf = model_path + "/landmark/groupdiv128a_vis_uncertain_sim.onnx";
+  param.feat_mf = model_path + "/feature/airfacenet_v1.onnx";
   param.emotion_mf = model_path + "/emotion/speaker_v5_island_v4_data3_sim.onnx";
   param.age_mf = model_path + "/age/tinyage_gray_112_age_gender_sim.onnx";
 }
