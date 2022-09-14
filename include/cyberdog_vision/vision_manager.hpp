@@ -35,6 +35,8 @@
 #include "protocol/srv/camera_service.hpp"
 #include "protocol/srv/algo_manager.hpp"
 #include "protocol/srv/face_manager.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
+#include "rclcpp_lifecycle/lifecycle_publisher.hpp"
 
 #include "cyberdog_vision/shared_memory_op.hpp"
 #include "cyberdog_vision/body_detection.hpp"
@@ -44,8 +46,6 @@
 #include "cyberdog_vision/person_reid.hpp"
 #include "cyberdog_vision/auto_track.hpp"
 #include "cyberdog_vision/face_manager.hpp"
-
-#include "nav2_util/lifecycle_node.hpp"
 
 namespace cyberdog_vision
 {
@@ -64,19 +64,20 @@ using AlgoManagerT = protocol::srv::AlgoManager;
 using FaceManagerT = protocol::srv::FaceManager;
 using FaceResultT = protocol::msg::FaceResult;
 
+using ReturnResult = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
-class VisionManager : public nav2_util::LifecycleNode
+class VisionManager : public rclcpp_lifecycle::LifecycleNode
 {
 public:
   VisionManager();
   ~VisionManager();
 
 protected:
-  nav2_util::CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
-  nav2_util::CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override;
-  nav2_util::CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override;
-  nav2_util::CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
-  nav2_util::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override;
+  ReturnResult on_configure(const rclcpp_lifecycle::State & state) override;
+  ReturnResult on_activate(const rclcpp_lifecycle::State & state) override;
+  ReturnResult on_deactivate(const rclcpp_lifecycle::State & state) override;
+  ReturnResult on_cleanup(const rclcpp_lifecycle::State & state) override;
+  ReturnResult on_shutdown(const rclcpp_lifecycle::State & state) override;
 
 private:
   int Init();

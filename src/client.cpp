@@ -36,10 +36,10 @@ int main(int argc, char ** argv)
   protocol::msg::AlgoList algo;
   // algo.algo_module = protocol::msg::AlgoList::ALGO_FACE;
   // request->algo_enable.push_back(algo);
-  // algo.algo_module = protocol::msg::AlgoList::ALGO_BODY;
-  // request->algo_enable.push_back(algo);
-  // algo.algo_module = protocol::msg::AlgoList::ALGO_REID;
-  // request->algo_enable.push_back(algo);
+  algo.algo_module = protocol::msg::AlgoList::ALGO_BODY;
+  request->algo_enable.push_back(algo);
+  algo.algo_module = protocol::msg::AlgoList::ALGO_REID;
+  request->algo_enable.push_back(algo);
   // algo.algo_module = protocol::msg::AlgoList::ALGO_GESTURE;
   // request->algo_enable.push_back(algo);
   // algo.algo_module = protocol::msg::AlgoList::ALGO_KEYPOINTS;

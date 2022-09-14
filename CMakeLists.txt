@@ -29,8 +29,8 @@ add_subdirectory(3rdparty)
 # find_package(<dependency> REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
 find_package(protocol REQUIRED)
-find_package(nav2_util REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 find_package(CUDA REQUIRED)
 find_package(XMBODY REQUIRED)
@@ -82,8 +82,8 @@ ament_target_dependencies(vision_manager
   XMREID
   XMTRACK
   rclcpp
+  rclcpp_lifecycle
   protocol
-  nav2_util
   OpenCV
   CUDA
 )
@@ -95,8 +95,8 @@ ament_target_dependencies(test_ai
   XMREID
   XMTRACK
   rclcpp
+  rclcpp_lifecycle
   protocol
-  nav2_util
   OpenCV
   CUDA
 )

@@ -34,41 +34,41 @@ namespace cyberdog_vision
 {
 
 VisionManager::VisionManager()
-: nav2_util::LifecycleNode("vision_manager"), shm_addr_(nullptr), buf_size_(6),
+: rclcpp_lifecycle::LifecycleNode("vision_manager"), shm_addr_(nullptr), buf_size_(6),
   open_face_(false), open_body_(false), open_gesture_(false), open_keypoints_(false),
   open_reid_(false), open_focus_(false), is_activate_(false)
 {
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 }
 
-nav2_util::CallbackReturn VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
+ReturnResult VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring vision_manager. ");
   if (0 != Init()) {
-    return nav2_util::CallbackReturn::FAILURE;
+    return ReturnResult::FAILURE;
   }
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResult::SUCCESS;
 }
 
-nav2_util::CallbackReturn VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
+ReturnResult VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating vision_manager. ");
   is_activate_ = true;
   person_pub_->on_activate();
   face_result_pub_->on_activate();
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResult::SUCCESS;
 }
 
-nav2_util::CallbackReturn VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
+ReturnResult VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Deactivating vision_manager. ");
   is_activate_ = false;
   person_pub_->on_deactivate();
   face_result_pub_->on_deactivate();
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResult::SUCCESS;
 }
 
-nav2_util::CallbackReturn VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
+ReturnResult VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up vision_manager. ");
   person_pub_.reset();
@@ -77,13 +77,13 @@ nav2_util::CallbackReturn VisionManager::on_cleanup(const rclcpp_lifecycle::Stat
   algo_manager_service_.reset();
   facemanager_service_.reset();
   camera_clinet_.reset();
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResult::SUCCESS;
 }
 
-nav2_util::CallbackReturn VisionManager::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
+ReturnResult VisionManager::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Shutting down vision_manager. ");
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResult::SUCCESS;
 }
 
 int VisionManager::Init()
