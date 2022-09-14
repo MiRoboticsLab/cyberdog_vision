@@ -34,18 +34,18 @@ int main(int argc, char ** argv)
 
   auto request = std::make_shared<protocol::srv::AlgoManager::Request>();
   protocol::msg::AlgoList algo;
-  algo.algo_module = protocol::msg::AlgoList::ALGO_FACE;
-  request->algo_enable.push_back(algo);
-  algo.algo_module = protocol::msg::AlgoList::ALGO_BODY;
-  request->algo_enable.push_back(algo);
-  algo.algo_module = protocol::msg::AlgoList::ALGO_REID;
-  request->algo_enable.push_back(algo);
+  // algo.algo_module = protocol::msg::AlgoList::ALGO_FACE;
+  // request->algo_enable.push_back(algo);
+  // algo.algo_module = protocol::msg::AlgoList::ALGO_BODY;
+  // request->algo_enable.push_back(algo);
+  // algo.algo_module = protocol::msg::AlgoList::ALGO_REID;
+  // request->algo_enable.push_back(algo);
   // algo.algo_module = protocol::msg::AlgoList::ALGO_GESTURE;
   // request->algo_enable.push_back(algo);
   // algo.algo_module = protocol::msg::AlgoList::ALGO_KEYPOINTS;
   // request->algo_enable.push_back(algo);
-  // algo.algo_module = protocol::msg::AlgoList::ALGO_FOCUS;
-  // request->algo_enable.push_back(algo);
+  algo.algo_module = protocol::msg::AlgoList::ALGO_FOCUS;
+  request->algo_enable.push_back(algo);
   request->open_age = true;
   request->open_emotion = true;
 

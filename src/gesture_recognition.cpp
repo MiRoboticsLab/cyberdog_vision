@@ -62,6 +62,7 @@ int GestureRecognition::GetGestureInfo(
       gesture_infos[i].left, gesture_infos[i].top,
       gesture_infos[i].right - gesture_infos[i].left,
       gesture_infos[i].bottom - gesture_infos[i].top);
+    std::cout << "gesture: " << gesture_infos[i].left << std::endl;
     info.label = gesture_infos[i].gestureLabel;
     infos.push_back(info);
   }

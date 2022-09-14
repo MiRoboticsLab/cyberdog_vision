@@ -516,6 +516,11 @@ void VisionManager::FocusTrack()
     // if (is_success) {
     //   cv::Mat img_show = stamped_img.img.clone();
     //   cv::rectangle(img_show, track_res, cv::Scalar(0, 0, 255));
+    //   char path[200];
+    //   sprintf(
+    //     path, "/SDCARD/result/%d.%d.jpg", stamped_img.header.stamp.sec,
+    //     stamped_img.header.stamp.nanosec);
+    //   cv::imwrite(path, img_show);
     //   cv::imshow("Track", img_show);
     //   cv::waitKey(10);
     // }
@@ -655,6 +660,25 @@ void Convert(const std::vector<std::vector<cv::Point2f>> & from, BodyInfoT & to)
   }
 }
 
+void drawLines(cv::Mat & img, std::vector<cv::Point2f> & points, cv::Scalar color, int thickness)
+{
+  std::vector<std::vector<int>> skeleton =
+  {{15, 13}, {13, 11}, {16, 14}, {14, 12}, {11, 12}, {5, 11}, {6, 12}, {5, 6},
+    {5, 7}, {6, 8}, {7, 9}, {8, 10}, {0, 1}, {0, 2}, {1, 3}, {2, 4}};
+
+  for (auto & pair : skeleton) {
+    if (points[pair[0]].x > 0. && points[pair[0]].y > 0. &&
+      points[pair[1]].x > 0. && points[pair[1]].y > 0.)
+    {
+      cv::circle(
+        img, points[pair[0]], 3, CV_RGB(255, 0, 0), -1);
+      cv::circle(
+        img, points[pair[1]], 3, CV_RGB(255, 0, 0), -1);
+      cv::line(img, points[pair[0]], points[pair[1]], color, thickness);
+    }
+  }
+}
+
 void VisionManager::KeypointsDet()
 {
   while (rclcpp::ok()) {
@@ -678,9 +702,7 @@ void VisionManager::KeypointsDet()
     // TODO(lff) remove: Debug - visual
     // cv::Mat img_show = body_results_.detection_img.img.clone();
     // for (size_t i = 0; i < bodies_keypoints.size(); ++i) {
-    //   for (size_t j = 0; j < bodies_keypoints[i].size(); ++j) {
-    //     cv::circle(img_show, bodies_keypoints[i][j], 1, cv::Scalar(0, 0, 255), cv::LINE_8);
-    //   }
+    //   drawLines(img_show, bodies_keypoints[i], cv::Scalar(255, 0, 0), 1);
     // }
     // cv::imshow("keypoints", img_show);
     // cv::waitKey(10);

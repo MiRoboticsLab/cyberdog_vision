@@ -106,10 +106,16 @@ add_executable(client
 )
 ament_target_dependencies(client rclcpp protocol)
 
+add_executable(produce
+  src/img_produce.cpp
+)
+ament_target_dependencies(produce OpenCV)
+
 install(TARGETS
   vision_manager
   test_ai
   client
+  produce
   DESTINATION lib/${PROJECT_NAME}
 )
 
