@@ -41,49 +41,53 @@ VisionManager::VisionManager()
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 }
 
-ReturnResult VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring vision_manager. ");
   if (0 != Init()) {
-    return ReturnResult::FAILURE;
+    return ReturnResultT::FAILURE;
   }
-  return ReturnResult::SUCCESS;
+  return ReturnResultT::SUCCESS;
 }
 
-ReturnResult VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating vision_manager. ");
   is_activate_ = true;
   person_pub_->on_activate();
+  status_pub_->on_activate();
   face_result_pub_->on_activate();
-  return ReturnResult::SUCCESS;
+  processing_status_.status = TrackingStatusT::STATUS_SELECTING;
+  return ReturnResultT::SUCCESS;
 }
 
-ReturnResult VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Deactivating vision_manager. ");
   is_activate_ = false;
   person_pub_->on_deactivate();
+  status_pub_->on_deactivate();
   face_result_pub_->on_deactivate();
-  return ReturnResult::SUCCESS;
+  return ReturnResultT::SUCCESS;
 }
 
-ReturnResult VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up vision_manager. ");
   person_pub_.reset();
+  status_pub_.reset();
   face_result_pub_.reset();
   tracking_service_.reset();
   algo_manager_service_.reset();
   facemanager_service_.reset();
   camera_clinet_.reset();
-  return ReturnResult::SUCCESS;
+  return ReturnResultT::SUCCESS;
 }
 
-ReturnResult VisionManager::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Shutting down vision_manager. ");
-  return ReturnResult::SUCCESS;
+  return ReturnResultT::SUCCESS;
 }
 
 int VisionManager::Init()
@@ -193,6 +197,7 @@ void VisionManager::CreateObject()
   rclcpp::SensorDataQoS pub_qos;
   pub_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
   person_pub_ = create_publisher<PersonInfoT>("person", pub_qos);
+  status_pub_ = create_publisher<TrackingStatusT>("processing_status", pub_qos);
 
   face_result_pub_ = create_publisher<FaceResultT>("/facemanager/face_result", pub_qos);
 }
@@ -279,6 +284,9 @@ void VisionManager::MainAlgoManager()
         PersonInfoT person_info;
         algo_result_ = person_info;
       }
+      if (open_body_ || open_focus_) {
+        status_pub_->publish(processing_status_);
+      }
     }
   }
 }
@@ -336,6 +344,9 @@ void VisionManager::DependAlgoManager()
         person_pub_->publish(algo_result_);
         PersonInfoT person_info;
         algo_result_ = person_info;
+      }
+      if (open_body_ || open_focus_) {
+        status_pub_->publish(processing_status_);
       }
     }
   }
@@ -508,8 +519,9 @@ void VisionManager::FocusTrack()
     // Focus track and get result
     cv::Rect track_res;
     bool is_success = focus_ptr_->Track(stamped_img.img, track_res);
-    if (!is_success) {
-      RCLCPP_WARN(get_logger(), "Auto track fail. ");
+    if (focus_ptr_->GetLostStatus()) {
+      RCLCPP_WARN(get_logger(), "Auto track object lost. ");
+      processing_status_.status = TrackingStatusT::STATUS_SELECTING;
     }
 
     // TODO(lff) remove: Debug - visualization
@@ -565,6 +577,9 @@ void VisionManager::ReIDProc()
         -1 != person_id)
       {
         RCLCPP_INFO(get_logger(), "Reid result, person id: %d", person_id);
+      }
+      if (reid_ptr_->GetLostStatus()) {
+        processing_status_.status = TrackingStatusT::STATUS_SELECTING;
       }
     }
 
@@ -847,6 +862,7 @@ void VisionManager::TrackingService(
       res->success = false;
     } else {
       res->success = true;
+      processing_status_.status = TrackingStatusT::STATUS_TRACKING;
     }
   }
 
@@ -863,6 +879,7 @@ void VisionManager::TrackingService(
       res->success = false;
     } else {
       res->success = true;
+      processing_status_.status = TrackingStatusT::STATUS_TRACKING;
     }
   }
 }

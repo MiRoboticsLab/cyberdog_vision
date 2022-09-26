@@ -23,7 +23,7 @@ namespace cyberdog_vision
 
 PersonReID::PersonReID(const std::string & model_path)
 : gpu_id_(0), tracking_id_(0), object_loss_th_(300), library_frame_num_(15), unmatch_count_(0),
-  feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), reid_ptr_(nullptr)
+  feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), is_lost_(false), reid_ptr_(nullptr)
 {
   std::cout << "===Init PersonReID===" << std::endl;
   std::string model_reid = model_path + "/reid_v1_mid.engine";
@@ -45,6 +45,7 @@ int PersonReID::SetTracker(
     tracking_id_++;
   }
   is_tracking_ = true;
+  is_lost_ = false;
 
   return 0;
 }
@@ -97,6 +98,7 @@ int PersonReID::GetReIDInfo(
     unmatch_count_++;
     if (unmatch_count_ > object_loss_th_) {
       std::cout << "Object is lost. " << std::endl;
+      is_lost_ = true;
       ResetTracker();
     }
   }
@@ -113,6 +115,11 @@ void PersonReID::ResetTracker()
   is_tracking_ = false;
   tracker_feat_.clear();
   tracking_id_++;
+}
+
+bool PersonReID::GetLostStatus()
+{
+  return is_lost_;
 }
 
 int PersonReID::GetFeature(

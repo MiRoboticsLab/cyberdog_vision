@@ -22,7 +22,7 @@ namespace cyberdog_vision
 {
 
 AutoTrack::AutoTrack(const std::string & model_path)
-: gpu_id_(0), loss_th_(300), fail_count_(0), is_init_(false)
+: gpu_id_(0), loss_th_(300), fail_count_(0), is_init_(false), is_lost_(false)
 {
   std::cout << "===Init AutoTrack===" << std::endl;
   std::string backbone_path = model_path + "/test_backbone.onnx";
@@ -39,6 +39,7 @@ bool AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
   bool is_success = tracker_ptr_->init(xm_img, bbox);
   if (is_success) {
     is_init_ = true;
+    is_lost_ = false;
     std::cout << "set auto track success." << std::endl;
   }
   return is_success;
@@ -60,6 +61,7 @@ bool AutoTrack::Track(const cv::Mat & img, cv::Rect & bbox)
     if (fail_count_ > loss_th_) {
       std::cout << "Object lost, please set tracker to restart. " << std::endl;
       is_init_ = false;
+      is_lost_ = true;
     }
     return false;
   }
@@ -71,6 +73,11 @@ bool AutoTrack::Track(const cv::Mat & img, cv::Rect & bbox)
 void AutoTrack::SetLossTh(int loss_th)
 {
   loss_th_ = loss_th;
+}
+
+bool AutoTrack::GetLostStatus()
+{
+  return is_lost_;
 }
 
 AutoTrack::~AutoTrack()

@@ -30,6 +30,7 @@
 #include "protocol/msg/track_result.hpp"
 #include "protocol/msg/algo_list.hpp"
 #include "protocol/msg/person.hpp"
+#include "protocol/msg/tracking_status.hpp"
 #include "protocol/msg/face_result.hpp"
 #include "protocol/srv/body_region.hpp"
 #include "protocol/srv/camera_service.hpp"
@@ -63,8 +64,8 @@ using CameraServiceT = protocol::srv::CameraService;
 using AlgoManagerT = protocol::srv::AlgoManager;
 using FaceManagerT = protocol::srv::FaceManager;
 using FaceResultT = protocol::msg::FaceResult;
-
-using ReturnResult = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+using TrackingStatusT = protocol::msg::TrackingStatus;
+using ReturnResultT = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
 class VisionManager : public rclcpp_lifecycle::LifecycleNode
 {
@@ -73,11 +74,11 @@ public:
   ~VisionManager();
 
 protected:
-  ReturnResult on_configure(const rclcpp_lifecycle::State & state) override;
-  ReturnResult on_activate(const rclcpp_lifecycle::State & state) override;
-  ReturnResult on_deactivate(const rclcpp_lifecycle::State & state) override;
-  ReturnResult on_cleanup(const rclcpp_lifecycle::State & state) override;
-  ReturnResult on_shutdown(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_configure(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_activate(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_deactivate(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_cleanup(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_shutdown(const rclcpp_lifecycle::State & state) override;
 
 private:
   int Init();
@@ -126,7 +127,9 @@ private:
   rclcpp::Service<AlgoManagerT>::SharedPtr algo_manager_service_;
   rclcpp::Service<FaceManagerT>::SharedPtr facemanager_service_;
   rclcpp::Client<CameraServiceT>::SharedPtr camera_clinet_;
+
   rclcpp_lifecycle::LifecyclePublisher<PersonInfoT>::SharedPtr person_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<TrackingStatusT>::SharedPtr status_pub_;
   rclcpp_lifecycle::LifecyclePublisher<FaceResultT>::SharedPtr face_result_pub_;
 
   std::shared_ptr<std::thread> img_proc_thread_;
@@ -161,6 +164,8 @@ private:
 
   std::mutex result_mtx_;
   PersonInfoT algo_result_;
+
+  TrackingStatusT processing_status_;
 
   int shm_id_;
   int sem_set_id_;
