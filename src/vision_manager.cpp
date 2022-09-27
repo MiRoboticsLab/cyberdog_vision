@@ -352,6 +352,22 @@ void VisionManager::DependAlgoManager()
   }
 }
 
+cv::Rect Convert(const sensor_msgs::msg::RegionOfInterest & roi)
+{
+  cv::Rect bbox = cv::Rect(roi.x_offset, roi.y_offset, roi.width, roi.height);
+  return bbox;
+}
+
+sensor_msgs::msg::RegionOfInterest Convert(const cv::Rect & bbox)
+{
+  sensor_msgs::msg::RegionOfInterest roi;
+  roi.x_offset = bbox.x;
+  roi.y_offset = bbox.y;
+  roi.width = bbox.width;
+  roi.height = bbox.height;
+  return roi;
+}
+
 void Convert(const std_msgs::msg::Header & header, const BodyFrameInfo & from, BodyInfoT & to)
 {
   to.header = header;
@@ -493,10 +509,7 @@ void Convert(
   const std_msgs::msg::Header & header, const cv::Rect & from, TrackResultT & to)
 {
   to.header = header;
-  to.roi.x_offset = from.x;
-  to.roi.y_offset = from.y;
-  to.roi.width = from.width;
-  to.roi.height = from.height;
+  to.roi = Convert(from);
 }
 
 void VisionManager::FocusTrack()
@@ -591,6 +604,8 @@ void VisionManager::ReIDProc()
       algo_proc_.process_num--;
       if (-1 != person_id) {
         algo_result_.body_info.infos[person_index].reid = std::to_string(person_id);
+        cv::Rect body_bbox = Convert(algo_result_.body_info.infos[person_index].roi);
+        Convert(algo_result_.body_info.header, body_bbox, algo_result_.track_res);
       }
       if (0 == algo_proc_.process_num) {
         algo_proc_.cond.notify_one();
@@ -602,10 +617,7 @@ void VisionManager::ReIDProc()
 void Convert(const std::vector<GestureInfo> & from, BodyInfoT & to)
 {
   for (size_t i = 0; i < from.size(); ++i) {
-    to.infos[i].gesture.roi.x_offset = from[i].rect.x;
-    to.infos[i].gesture.roi.y_offset = from[i].rect.y;
-    to.infos[i].gesture.roi.width = from[i].rect.width;
-    to.infos[i].gesture.roi.height = from[i].rect.height;
+    to.infos[i].gesture.roi = Convert(from[i].rect);
     to.infos[i].gesture.cls = from[i].label;
   }
 }
@@ -873,7 +885,7 @@ void VisionManager::TrackingService(
       std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
       stamped_img = global_img_buf_.img_buf.back();
     }
-    cv::Rect rect = cv::Rect(req->roi.x_offset, req->roi.y_offset, req->roi.width, req->roi.height);
+    cv::Rect rect = Convert(req->roi);
     if (!focus_ptr_->SetTracker(stamped_img.img, rect)) {
       RCLCPP_WARN(get_logger(), "Set focus tracker fail. ");
       res->success = false;
