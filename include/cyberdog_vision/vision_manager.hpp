@@ -30,11 +30,14 @@
 #include "protocol/msg/track_result.hpp"
 #include "protocol/msg/algo_list.hpp"
 #include "protocol/msg/person.hpp"
+#include "protocol/msg/tracking_status.hpp"
 #include "protocol/msg/face_result.hpp"
 #include "protocol/srv/body_region.hpp"
 #include "protocol/srv/camera_service.hpp"
 #include "protocol/srv/algo_manager.hpp"
 #include "protocol/srv/face_manager.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
+#include "rclcpp_lifecycle/lifecycle_publisher.hpp"
 
 #include "cyberdog_vision/shared_memory_op.hpp"
 #include "cyberdog_vision/body_detection.hpp"
@@ -44,8 +47,6 @@
 #include "cyberdog_vision/person_reid.hpp"
 #include "cyberdog_vision/auto_track.hpp"
 #include "cyberdog_vision/face_manager.hpp"
-
-#include "nav2_util/lifecycle_node.hpp"
 
 namespace cyberdog_vision
 {
@@ -63,20 +64,21 @@ using CameraServiceT = protocol::srv::CameraService;
 using AlgoManagerT = protocol::srv::AlgoManager;
 using FaceManagerT = protocol::srv::FaceManager;
 using FaceResultT = protocol::msg::FaceResult;
+using TrackingStatusT = protocol::msg::TrackingStatus;
+using ReturnResultT = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
-
-class VisionManager : public nav2_util::LifecycleNode
+class VisionManager : public rclcpp_lifecycle::LifecycleNode
 {
 public:
   VisionManager();
   ~VisionManager();
 
 protected:
-  nav2_util::CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
-  nav2_util::CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override;
-  nav2_util::CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override;
-  nav2_util::CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
-  nav2_util::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_configure(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_activate(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_deactivate(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_cleanup(const rclcpp_lifecycle::State & state) override;
+  ReturnResultT on_shutdown(const rclcpp_lifecycle::State & state) override;
 
 private:
   int Init();
@@ -125,7 +127,9 @@ private:
   rclcpp::Service<AlgoManagerT>::SharedPtr algo_manager_service_;
   rclcpp::Service<FaceManagerT>::SharedPtr facemanager_service_;
   rclcpp::Client<CameraServiceT>::SharedPtr camera_clinet_;
+
   rclcpp_lifecycle::LifecyclePublisher<PersonInfoT>::SharedPtr person_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<TrackingStatusT>::SharedPtr status_pub_;
   rclcpp_lifecycle::LifecyclePublisher<FaceResultT>::SharedPtr face_result_pub_;
 
   std::shared_ptr<std::thread> img_proc_thread_;
@@ -160,6 +164,8 @@ private:
 
   std::mutex result_mtx_;
   PersonInfoT algo_result_;
+
+  TrackingStatusT processing_status_;
 
   int shm_id_;
   int sem_set_id_;

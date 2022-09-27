@@ -43,6 +43,7 @@ public:
     size_t & index);
   int GetFeatureLen();
   void ResetTracker();
+  bool GetLostStatus();
 
 private:
   int GetFeature(const cv::Mat & img, const cv::Rect & body_box, std::vector<float> & reid_feat);
@@ -58,6 +59,7 @@ private:
   float feat_sim_th_;
   float feat_update_th_;
   bool is_tracking_;
+  bool is_lost_;
 
   void * reid_ptr_;
   std::vector<float> tracker_feat_;

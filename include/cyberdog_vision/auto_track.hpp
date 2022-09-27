@@ -32,6 +32,7 @@ public:
   bool SetTracker(const cv::Mat & img, const cv::Rect & bbox);
   bool Track(const cv::Mat & img, cv::Rect & bbox);
   void SetLossTh(int loss_th);
+  bool GetLostStatus();
 
 private:
   std::shared_ptr<TRACKER::Tracker> tracker_ptr_;
@@ -40,6 +41,7 @@ private:
   int loss_th_;
   int fail_count_;
   bool is_init_;
+  bool is_lost_;
 };
 
 }  // namespace cyberdog_vision

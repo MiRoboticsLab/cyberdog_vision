@@ -34,56 +34,60 @@ namespace cyberdog_vision
 {
 
 VisionManager::VisionManager()
-: nav2_util::LifecycleNode("vision_manager"), shm_addr_(nullptr), buf_size_(6),
+: rclcpp_lifecycle::LifecycleNode("vision_manager"), shm_addr_(nullptr), buf_size_(6),
   open_face_(false), open_body_(false), open_gesture_(false), open_keypoints_(false),
   open_reid_(false), open_focus_(false), is_activate_(false)
 {
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 }
 
-nav2_util::CallbackReturn VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring vision_manager. ");
   if (0 != Init()) {
-    return nav2_util::CallbackReturn::FAILURE;
+    return ReturnResultT::FAILURE;
   }
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResultT::SUCCESS;
 }
 
-nav2_util::CallbackReturn VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating vision_manager. ");
   is_activate_ = true;
   person_pub_->on_activate();
+  status_pub_->on_activate();
   face_result_pub_->on_activate();
-  return nav2_util::CallbackReturn::SUCCESS;
+  processing_status_.status = TrackingStatusT::STATUS_SELECTING;
+  return ReturnResultT::SUCCESS;
 }
 
-nav2_util::CallbackReturn VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Deactivating vision_manager. ");
   is_activate_ = false;
   person_pub_->on_deactivate();
+  status_pub_->on_deactivate();
   face_result_pub_->on_deactivate();
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResultT::SUCCESS;
 }
 
-nav2_util::CallbackReturn VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up vision_manager. ");
   person_pub_.reset();
+  status_pub_.reset();
   face_result_pub_.reset();
   tracking_service_.reset();
   algo_manager_service_.reset();
   facemanager_service_.reset();
   camera_clinet_.reset();
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResultT::SUCCESS;
 }
 
-nav2_util::CallbackReturn VisionManager::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
+ReturnResultT VisionManager::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Shutting down vision_manager. ");
-  return nav2_util::CallbackReturn::SUCCESS;
+  return ReturnResultT::SUCCESS;
 }
 
 int VisionManager::Init()
@@ -193,6 +197,7 @@ void VisionManager::CreateObject()
   rclcpp::SensorDataQoS pub_qos;
   pub_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
   person_pub_ = create_publisher<PersonInfoT>("person", pub_qos);
+  status_pub_ = create_publisher<TrackingStatusT>("processing_status", pub_qos);
 
   face_result_pub_ = create_publisher<FaceResultT>("/facemanager/face_result", pub_qos);
 }
@@ -279,6 +284,9 @@ void VisionManager::MainAlgoManager()
         PersonInfoT person_info;
         algo_result_ = person_info;
       }
+      if (open_body_ || open_focus_) {
+        status_pub_->publish(processing_status_);
+      }
     }
   }
 }
@@ -336,6 +344,9 @@ void VisionManager::DependAlgoManager()
         person_pub_->publish(algo_result_);
         PersonInfoT person_info;
         algo_result_ = person_info;
+      }
+      if (open_body_ || open_focus_) {
+        status_pub_->publish(processing_status_);
       }
     }
   }
@@ -508,14 +519,20 @@ void VisionManager::FocusTrack()
     // Focus track and get result
     cv::Rect track_res;
     bool is_success = focus_ptr_->Track(stamped_img.img, track_res);
-    if (!is_success) {
-      RCLCPP_WARN(get_logger(), "Auto track fail. ");
+    if (focus_ptr_->GetLostStatus()) {
+      RCLCPP_WARN(get_logger(), "Auto track object lost. ");
+      processing_status_.status = TrackingStatusT::STATUS_SELECTING;
     }
 
     // TODO(lff) remove: Debug - visualization
     // if (is_success) {
     //   cv::Mat img_show = stamped_img.img.clone();
     //   cv::rectangle(img_show, track_res, cv::Scalar(0, 0, 255));
+    //   char path[200];
+    //   sprintf(
+    //     path, "/SDCARD/result/%d.%d.jpg", stamped_img.header.stamp.sec,
+    //     stamped_img.header.stamp.nanosec);
+    //   cv::imwrite(path, img_show);
     //   cv::imshow("Track", img_show);
     //   cv::waitKey(10);
     // }
@@ -560,6 +577,9 @@ void VisionManager::ReIDProc()
         -1 != person_id)
       {
         RCLCPP_INFO(get_logger(), "Reid result, person id: %d", person_id);
+      }
+      if (reid_ptr_->GetLostStatus()) {
+        processing_status_.status = TrackingStatusT::STATUS_SELECTING;
       }
     }
 
@@ -655,6 +675,25 @@ void Convert(const std::vector<std::vector<cv::Point2f>> & from, BodyInfoT & to)
   }
 }
 
+void drawLines(cv::Mat & img, std::vector<cv::Point2f> & points, cv::Scalar color, int thickness)
+{
+  std::vector<std::vector<int>> skeleton =
+  {{15, 13}, {13, 11}, {16, 14}, {14, 12}, {11, 12}, {5, 11}, {6, 12}, {5, 6},
+    {5, 7}, {6, 8}, {7, 9}, {8, 10}, {0, 1}, {0, 2}, {1, 3}, {2, 4}};
+
+  for (auto & pair : skeleton) {
+    if (points[pair[0]].x > 0. && points[pair[0]].y > 0. &&
+      points[pair[1]].x > 0. && points[pair[1]].y > 0.)
+    {
+      cv::circle(
+        img, points[pair[0]], 3, CV_RGB(255, 0, 0), -1);
+      cv::circle(
+        img, points[pair[1]], 3, CV_RGB(255, 0, 0), -1);
+      cv::line(img, points[pair[0]], points[pair[1]], color, thickness);
+    }
+  }
+}
+
 void VisionManager::KeypointsDet()
 {
   while (rclcpp::ok()) {
@@ -678,9 +717,7 @@ void VisionManager::KeypointsDet()
     // TODO(lff) remove: Debug - visual
     // cv::Mat img_show = body_results_.detection_img.img.clone();
     // for (size_t i = 0; i < bodies_keypoints.size(); ++i) {
-    //   for (size_t j = 0; j < bodies_keypoints[i].size(); ++j) {
-    //     cv::circle(img_show, bodies_keypoints[i][j], 1, cv::Scalar(0, 0, 255), cv::LINE_8);
-    //   }
+    //   drawLines(img_show, bodies_keypoints[i], cv::Scalar(255, 0, 0), 1);
     // }
     // cv::imshow("keypoints", img_show);
     // cv::waitKey(10);
@@ -825,6 +862,7 @@ void VisionManager::TrackingService(
       res->success = false;
     } else {
       res->success = true;
+      processing_status_.status = TrackingStatusT::STATUS_TRACKING;
     }
   }
 
@@ -841,6 +879,7 @@ void VisionManager::TrackingService(
       res->success = false;
     } else {
       res->success = true;
+      processing_status_.status = TrackingStatusT::STATUS_TRACKING;
     }
   }
 }
