@@ -84,6 +84,10 @@ private:
   int Init();
   int InitIPC();
   void CreateObject();
+  void CreateThread();
+  void DestoryThread();
+  void WakeThread(AlgoStruct & algo);
+  void ResetAlgo();
   void ImageProc();
   void MainAlgoManager();
   void DependAlgoManager();
