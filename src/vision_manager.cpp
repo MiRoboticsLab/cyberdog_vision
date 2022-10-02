@@ -53,7 +53,12 @@ ReturnResultT VisionManager::on_configure(const rclcpp_lifecycle::State & /*stat
 ReturnResultT VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating vision_manager. ");
+  if (!CallService(camera_clinet_, 0, "face-interval=1")) {
+    RCLCPP_ERROR(get_logger(), "Start camera stream fail. ");
+    return ReturnResultT::FAILURE;
+  }
   is_activate_ = true;
+  CreateThread();
   person_pub_->on_activate();
   status_pub_->on_activate();
   face_result_pub_->on_activate();
@@ -65,6 +70,12 @@ ReturnResultT VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*sta
 {
   RCLCPP_INFO(get_logger(), "Deactivating vision_manager. ");
   is_activate_ = false;
+  ResetAlgo();
+  DestoryThread();
+  if (!CallService(camera_clinet_, 0, "face-interval=0")) {
+    RCLCPP_ERROR(get_logger(), "Close camera stream fail. ");
+    return ReturnResultT::FAILURE;
+  }
   person_pub_->on_deactivate();
   status_pub_->on_deactivate();
   face_result_pub_->on_deactivate();
@@ -74,6 +85,15 @@ ReturnResultT VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*sta
 ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up vision_manager. ");
+  img_proc_thread_.reset();
+  main_manager_thread_.reset();
+  depend_manager_thread_.reset();
+  body_det_thread_.reset();
+  face_thread_.reset();
+  focus_thread_.reset();
+  gesture_thread_.reset();
+  reid_thread_.reset();
+  keypoints_thread_.reset();
   person_pub_.reset();
   status_pub_.reset();
   face_result_pub_.reset();
@@ -99,21 +119,6 @@ int VisionManager::Init()
 
   // Create object
   CreateObject();
-  if (!CallService(camera_clinet_, 0, "face-interval=1")) {
-    RCLCPP_ERROR(get_logger(), "Start camera stream fail. ");
-    return -1;
-  }
-
-  // Create process thread
-  img_proc_thread_ = std::make_shared<std::thread>(&VisionManager::ImageProc, this);
-  main_manager_thread_ = std::make_shared<std::thread>(&VisionManager::MainAlgoManager, this);
-  depend_manager_thread_ = std::make_shared<std::thread>(&VisionManager::DependAlgoManager, this);
-  body_det_thread_ = std::make_shared<std::thread>(&VisionManager::BodyDet, this);
-  face_thread_ = std::make_shared<std::thread>(&VisionManager::FaceRecognize, this);
-  focus_thread_ = std::make_shared<std::thread>(&VisionManager::FocusTrack, this);
-  gesture_thread_ = std::make_shared<std::thread>(&VisionManager::GestureRecognize, this);
-  reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
-  keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
 
   return 0;
 }
@@ -202,30 +207,104 @@ void VisionManager::CreateObject()
   face_result_pub_ = create_publisher<FaceResultT>("/facemanager/face_result", pub_qos);
 }
 
+void VisionManager::CreateThread()
+{
+  img_proc_thread_ = std::make_shared<std::thread>(&VisionManager::ImageProc, this);
+  main_manager_thread_ = std::make_shared<std::thread>(&VisionManager::MainAlgoManager, this);
+  depend_manager_thread_ = std::make_shared<std::thread>(&VisionManager::DependAlgoManager, this);
+  body_det_thread_ = std::make_shared<std::thread>(&VisionManager::BodyDet, this);
+  face_thread_ = std::make_shared<std::thread>(&VisionManager::FaceRecognize, this);
+  focus_thread_ = std::make_shared<std::thread>(&VisionManager::FocusTrack, this);
+  gesture_thread_ = std::make_shared<std::thread>(&VisionManager::GestureRecognize, this);
+  reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
+  keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
+}
+
+void VisionManager::DestoryThread()
+{
+  WakeThread(body_struct_);
+  WakeThread(face_struct_);
+  WakeThread(focus_struct_);
+  WakeThread(gesture_struct_);
+  WakeThread(reid_struct_);
+  WakeThread(keypoints_struct_);
+
+  {
+    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+    body_results_.is_filled = true;
+    body_results_.cond.notify_one();
+  }
+  if (depend_manager_thread_->joinable()) {
+    depend_manager_thread_->join();
+  }
+  if (img_proc_thread_->joinable()) {
+    img_proc_thread_->join();
+  }
+  if (main_manager_thread_->joinable()) {
+    main_manager_thread_->join();
+  }
+  if (body_det_thread_->joinable()) {
+    body_det_thread_->join();
+  }
+  if (face_thread_->joinable()) {
+    face_thread_->join();
+  }
+  if (focus_thread_->joinable()) {
+    focus_thread_->join();
+  }
+  if (gesture_thread_->joinable()) {
+    gesture_thread_->join();
+  }
+  if (reid_thread_->joinable()) {
+    reid_thread_->join();
+  }
+  if (keypoints_thread_->joinable()) {
+    keypoints_thread_->join();
+  }
+}
+
+void VisionManager::WakeThread(AlgoStruct & algo)
+{
+  std::unique_lock<std::mutex> lk(algo.mtx);
+  algo.is_called = true;
+  algo.cond.notify_one();
+}
+
+void VisionManager::ResetAlgo()
+{
+  focus_ptr_->ResetTracker();
+  reid_ptr_->ResetTracker();
+  open_face_ = false;
+  open_body_ = false;
+  open_gesture_ = false;
+  open_keypoints_ = false;
+  open_reid_ = false;
+  open_focus_ = false;
+}
+
 void VisionManager::ImageProc()
 {
   while (rclcpp::ok()) {
-    if (is_activate_) {
-      WaitSem(sem_set_id_, 2);
-      WaitSem(sem_set_id_, 0);
-      StampedImage simg;
-      simg.img.create(480, 640, CV_8UC3);
-      memcpy(simg.img.data, reinterpret_cast<char *>(shm_addr_) + sizeof(uint64_t), IMAGE_SIZE);
-      uint64_t time;
-      memcpy(&time, reinterpret_cast<char *>(shm_addr_), sizeof(uint64_t));
-      simg.header.stamp.sec = time / 1000000000;
-      simg.header.stamp.nanosec = time % 1000000000;
-      SignalSem(sem_set_id_, 0);
-      SignalSem(sem_set_id_, 1);
+    if (!is_activate_) {return;}
+    WaitSem(sem_set_id_, 2);
+    WaitSem(sem_set_id_, 0);
+    StampedImage simg;
+    simg.img.create(480, 640, CV_8UC3);
+    memcpy(simg.img.data, reinterpret_cast<char *>(shm_addr_) + sizeof(uint64_t), IMAGE_SIZE);
+    uint64_t time;
+    memcpy(&time, reinterpret_cast<char *>(shm_addr_), sizeof(uint64_t));
+    simg.header.stamp.sec = time / 1000000000;
+    simg.header.stamp.nanosec = time % 1000000000;
+    SignalSem(sem_set_id_, 0);
+    SignalSem(sem_set_id_, 1);
 
-      // Save image to buffer, only process with real img
-      {
-        std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
-        global_img_buf_.img_buf.clear();
-        global_img_buf_.img_buf.push_back(simg);
-        global_img_buf_.is_filled = true;
-        global_img_buf_.cond.notify_one();
-      }
+    // Save image to buffer, only process with real img
+    {
+      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+      global_img_buf_.img_buf.clear();
+      global_img_buf_.img_buf.push_back(simg);
+      global_img_buf_.is_filled = true;
+      global_img_buf_.cond.notify_one();
     }
   }
 }
@@ -239,6 +318,7 @@ void VisionManager::MainAlgoManager()
       global_img_buf_.is_filled = false;
       std::cout << "===Activate main algo manager thread. " << std::endl;
     }
+    if (!is_activate_) {return;}
 
     if (open_body_) {
       std::lock(algo_proc_.mtx, body_struct_.mtx);
@@ -274,7 +354,9 @@ void VisionManager::MainAlgoManager()
     }
 
     // Wait for result to pub
-    if (!open_gesture_ && !open_keypoints_ && !open_reid_) {
+    if (!open_gesture_ && !open_keypoints_ && !open_reid_ &&
+      (open_body_ || open_face_ || open_focus_))
+    {
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
       algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
       {
@@ -300,6 +382,7 @@ void VisionManager::DependAlgoManager()
       body_results_.is_filled = false;
       std::cout << "===Activate depend algo manager thread. " << std::endl;
     }
+    if (!is_activate_) {return;}
 
     if (open_reid_) {
       std::lock(algo_proc_.mtx, reid_struct_.mtx);
@@ -392,6 +475,7 @@ void VisionManager::BodyDet()
       body_struct_.is_called = false;
       std::cout << "===Activate body detect thread. " << std::endl;
     }
+    if (!is_activate_) {return;}
 
     // Get image and detect body
     StampedImage stamped_img;
@@ -477,6 +561,7 @@ void VisionManager::FaceRecognize()
       face_struct_.is_called = false;
       std::cout << "===Activate face recognition thread. " << std::endl;
     }
+    if (!is_activate_) {return;}
 
     // Get image to proc
     StampedImage stamped_img;
@@ -521,6 +606,7 @@ void VisionManager::FocusTrack()
       focus_struct_.is_called = false;
       std::cout << "===Activate focus thread. " << std::endl;
     }
+    if (!is_activate_) {return;}
 
     // Get image to proc
     StampedImage stamped_img;
@@ -578,6 +664,7 @@ void VisionManager::ReIDProc()
       reid_struct_.is_called = false;
       std::cout << "===Activate reid thread. " << std::endl;
     }
+    if (!is_activate_) {return;}
 
     // ReID and get result
     {
@@ -631,6 +718,7 @@ void VisionManager::GestureRecognize()
       gesture_struct_.is_called = false;
       std::cout << "===Activate gesture recognition thread. " << std::endl;
     }
+    if (!is_activate_) {return;}
 
     // Gesture recognition and get result
     bool is_success = false;
@@ -715,6 +803,7 @@ void VisionManager::KeypointsDet()
       keypoints_struct_.is_called = false;
       std::cout << "===Activate keypoints detection thread. " << std::endl;
     }
+    if (!is_activate_) {return;}
 
     // Keypoints detection and get result
     std::vector<std::vector<cv::Point2f>> bodies_keypoints;
@@ -902,7 +991,6 @@ void VisionManager::AlgoManagerService(
   std::shared_ptr<AlgoManagerT::Response> res)
 {
   RCLCPP_INFO(get_logger(), "Received algo request. ");
-  std::cout << "Algo enable: " << std::endl;
   for (size_t i = 0; i < req->algo_enable.size(); ++i) {
     SetAlgoState(req->algo_enable[i], true);
   }
@@ -1119,9 +1207,7 @@ bool VisionManager::CallService(
 
 VisionManager::~VisionManager()
 {
-  if (img_proc_thread_->joinable()) {
-    img_proc_thread_->join();
-  }
+  DestoryThread();
 
   if (0 == DetachShm(shm_addr_)) {
     DelShm(shm_id_);

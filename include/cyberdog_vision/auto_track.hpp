@@ -32,6 +32,7 @@ public:
   bool SetTracker(const cv::Mat & img, const cv::Rect & bbox);
   bool Track(const cv::Mat & img, cv::Rect & bbox);
   void SetLossTh(int loss_th);
+  void ResetTracker();
   bool GetLostStatus();
 
 private:

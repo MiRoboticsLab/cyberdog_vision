@@ -75,6 +75,11 @@ void AutoTrack::SetLossTh(int loss_th)
   loss_th_ = loss_th;
 }
 
+void AutoTrack::ResetTracker()
+{
+  is_init_ = false;
+}
+
 bool AutoTrack::GetLostStatus()
 {
   return is_lost_;

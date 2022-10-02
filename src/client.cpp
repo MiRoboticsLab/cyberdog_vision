@@ -44,8 +44,8 @@ int main(int argc, char ** argv)
   // request->algo_enable.push_back(algo);
   // algo.algo_module = protocol::msg::AlgoList::ALGO_KEYPOINTS;
   // request->algo_enable.push_back(algo);
-  algo.algo_module = protocol::msg::AlgoList::ALGO_FOCUS;
-  request->algo_enable.push_back(algo);
+  // algo.algo_module = protocol::msg::AlgoList::ALGO_FOCUS;
+  // request->algo_enable.push_back(algo);
   request->open_age = true;
   request->open_emotion = true;
 
