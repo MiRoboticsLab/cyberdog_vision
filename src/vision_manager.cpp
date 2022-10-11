@@ -204,7 +204,7 @@ void VisionManager::CreateObject()
   person_pub_ = create_publisher<PersonInfoT>("person", pub_qos);
   status_pub_ = create_publisher<TrackingStatusT>("processing_status", pub_qos);
 
-  face_result_pub_ = create_publisher<FaceResultT>("/facemanager/face_result", pub_qos);
+  face_result_pub_ = create_publisher<FaceResultT>("facemanager/face_result", pub_qos);
 }
 
 void VisionManager::CreateThread()
