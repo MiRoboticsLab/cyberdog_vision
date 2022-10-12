@@ -101,6 +101,12 @@ ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*
   algo_manager_service_.reset();
   facemanager_service_.reset();
   camera_clinet_.reset();
+  body_ptr_.reset();
+  face_ptr_.reset();
+  focus_ptr_.reset();
+  gesture_ptr_.reset();
+  reid_ptr_.reset();
+  keypoints_ptr_.reset();
   return ReturnResultT::SUCCESS;
 }
 

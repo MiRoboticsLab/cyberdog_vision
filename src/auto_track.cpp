@@ -65,7 +65,7 @@ bool AutoTrack::Track(const cv::Mat & img, cv::Rect & bbox)
     }
     return false;
   }
-  bbox = track_box.rect;
+  bbox = track_box.rect & cv::Rect(0, 0, img.cols, img.rows);
   fail_count_ = 0;
   return true;
 }
