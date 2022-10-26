@@ -1087,7 +1087,7 @@ void VisionManager::publishFaceResult(
   face_result_msg->result = result;
   face_result_msg->msg = face_msg;
 
-  if (result == 0) {
+  if (result == 0 || result == 17) {
     std::vector<unsigned char> png_buff;
     std::vector<int> png_param = std::vector<int>(2);
     png_param[0] = 16;  // CV_IMWRITE_PNG_QUALITY;
@@ -1122,6 +1122,7 @@ void VisionManager::FaceDetProc(std::string face_name)
   int checkFacePose_ret;
   endlib_feats = FaceManager::getInstance()->getFeatures();
   std::time_t cur_time = std::time(NULL);
+
   while (std::difftime(std::time(NULL), cur_time) < 40 && face_detect_) {
     get_face_timeout = false;
     std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
@@ -1147,28 +1148,25 @@ void VisionManager::FaceDetProc(std::string face_name)
     cv::waitKey(10);
 #endif
     checkFacePose_ret = FaceManager::getInstance()->checkFacePose(faces_info, checkFacePose_Msg);
-    if (checkFacePose_ret == 0) {  // check weather cur feature alrady in endlib
-#if 0
+    if (checkFacePose_ret == 0) {
       /*check if face feature already in endlib_feats*/
       face_ptr_->GetRecognitionResult(mat_tmp, endlib_feats, match_info);
-      // printf("match_info:match_score:%f\n",match_info[0].match_score);
-      if (match_info.size() > 0 && match_info[0].match_score > 0.9) {
-        publishFaceResult(-1, match_info[0].face_id, mat_tmp);
-        RCLCPP_ERROR(get_logger(), "%s already in endlib\n", match_info[0].face_id.c_str());
-        break;
+      if (match_info.size() > 0 && match_info[0].match_score > 0.65) {
+        checkFacePose_ret = 17;
+        face_name = match_info[0].face_id;
+        checkFacePose_Msg = "face already in endlib";
+        RCLCPP_ERROR(get_logger(), "%s face already in endlib current score:%f", face_name.c_str(),match_info[0].match_score);
+      }else{
+        FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
       }
-#endif
-      FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
     }
     publishFaceResult(checkFacePose_ret, face_name, mat_tmp, checkFacePose_Msg);
-    cout << "cur status:" << checkFacePose_Msg << endl;
-    if (checkFacePose_ret == 0) {
+    if (checkFacePose_ret == 0 || checkFacePose_ret == 17) {
       break;
     }
     get_face_timeout = true;
   }
 
-  // cv::destroyAllWindows();
   /*it time out publish error*/
   if (get_face_timeout && face_detect_) {
     checkFacePose_Msg = "timeout";
