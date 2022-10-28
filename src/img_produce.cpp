@@ -90,12 +90,16 @@ int main(int argc, char ** argv)
     return -1;
   }
 
+  int i = 0;
   while (true) {
+    std::cout << "Frame: " << i++ << std::endl;
     cv::Mat img;
     cap >> img;
+    cv::resize(img, img, cv::Size(640, 480));
     if (0 != proc_->Produce(img)) {
       return -1;
     }
+    cv::waitKey(50);
   }
 
   delete proc_;

@@ -40,7 +40,7 @@ public:
   int SetTracker(const cv::Mat & img, const cv::Rect & body_box, std::vector<float> & reid_feat);
   int GetReIDInfo(
     const cv::Mat & img, const std::vector<InferBbox> & body_bboxes, int & id,
-    size_t & index);
+    cv::Rect & tracked);
   int GetFeatureLen();
   void ResetTracker();
   bool GetLostStatus();
