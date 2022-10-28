@@ -163,6 +163,7 @@ int VisionManager::InitIPC()
 
 void VisionManager::CreateObject()
 {
+  RCLCPP_INFO(get_logger(), "===Create obj. ");
   // Create AI object
   body_ptr_ = std::make_shared<BodyDetection>(
     kModelPath + std::string("/body_gesture"));
@@ -659,11 +660,54 @@ void VisionManager::FocusTrack()
   }
 }
 
+double GetIOU(const HumanBodyInfo & b1, const sensor_msgs::msg::RegionOfInterest & b2)
+{
+  int w =
+    std::max(
+    std::min((b1.left + b1.width), (b2.x_offset + b2.width)) - std::max(
+      b1.left,
+      b2.x_offset),
+    (uint32_t)0);
+  int h =
+    std::max(
+    std::min((b1.top + b1.height), (b2.y_offset + b2.height)) - std::max(
+      b1.top,
+      b2.y_offset),
+    (uint32_t)0);
+
+  return w * h / static_cast<double>(b1.width * b1.height +
+         b2.width * b2.height - w * h);
+}
+
+// TODO: remove after app add track_res
+void AddReid(BodyInfoT & body_info, int id, const cv::Rect & tracked)
+{
+  if (0 != body_info.infos.size()) {
+    return;
+  }
+
+  double iou_max = 0.0;
+  int index = 0;
+  for (size_t i = 0; i < body_info.infos.size(); ++i) {
+    HumanBodyInfo body;
+    body.left = tracked.x;
+    body.top = tracked.y;
+    body.width = tracked.width;
+    body.height = tracked.height;
+    double iou = GetIOU(body, body_info.infos[i].roi);
+    if (iou > iou_max) {
+      iou_max = iou;
+      index = i;
+    }
+  }
+  body_info.infos[index].reid = std::to_string(id);
+}
+
 void VisionManager::ReIDProc()
 {
   while (rclcpp::ok()) {
     int person_id = -1;
-    size_t person_index;
+    cv::Rect tracked_bbox;
     {
       std::unique_lock<std::mutex> lk_reid(reid_struct_.mtx);
       reid_struct_.cond.wait(lk_reid, [this] {return reid_struct_.is_called;});
@@ -673,16 +717,19 @@ void VisionManager::ReIDProc()
     if (!is_activate_) {return;}
 
     // ReID and get result
+    cv::Mat img_show;
     {
       std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
       std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
+      img_show = body_results_.detection_img.img.clone();
       if (-1 !=
         reid_ptr_->GetReIDInfo(
-          body_results_.detection_img.img, body_bboxes, person_id,
-          person_index) &&
+          body_results_.detection_img.img, body_bboxes, person_id, tracked_bbox) &&
         -1 != person_id)
       {
-        RCLCPP_INFO(get_logger(), "Reid result, person id: %d", person_id);
+        RCLCPP_INFO(
+          get_logger(), "Reid result, person id: %d, bbox: %d, %d, %d, %d", person_id, tracked_bbox.x, tracked_bbox.y, tracked_bbox.width,
+          tracked_bbox.height);
       }
       if (reid_ptr_->GetLostStatus()) {
         processing_status_.status = TrackingStatusT::STATUS_SELECTING;
@@ -696,10 +743,13 @@ void VisionManager::ReIDProc()
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       algo_proc_.process_num--;
       if (-1 != person_id) {
-        algo_result_.body_info.infos[person_index].reid = std::to_string(person_id);
-        cv::Rect body_bbox = Convert(algo_result_.body_info.infos[person_index].roi);
-        Convert(algo_result_.body_info.header, body_bbox, algo_result_.track_res);
+        // algo_result_.body_info.infos[person_index].reid = std::to_string(person_id);
+        AddReid(algo_result_.body_info, person_id, tracked_bbox);
+        Convert(algo_result_.body_info.header, tracked_bbox, algo_result_.track_res);
+        // cv::rectangle(img_show, tracked_bbox, cv::Scalar(0, 0, 255));
       }
+      // cv::imshow("reid", img_show);
+      // cv::waitKey(10);
       if (0 == algo_proc_.process_num) {
         algo_proc_.cond.notify_one();
       }
@@ -867,25 +917,6 @@ int VisionManager::LoadFaceLibrary(std::map<std::string, std::vector<float>> & l
   }
 
   return 0;
-}
-
-double GetIOU(const HumanBodyInfo & b1, const sensor_msgs::msg::RegionOfInterest & b2)
-{
-  int w =
-    std::max(
-    std::min((b1.left + b1.width), (b2.x_offset + b2.width)) - std::max(
-      b1.left,
-      b2.x_offset),
-    (uint32_t)0);
-  int h =
-    std::max(
-    std::min((b1.top + b1.height), (b2.y_offset + b2.height)) - std::max(
-      b1.top,
-      b2.y_offset),
-    (uint32_t)0);
-
-  return w * h / static_cast<double>(b1.width * b1.height +
-         b2.width * b2.height - w * h);
 }
 
 int VisionManager::GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi)

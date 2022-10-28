@@ -23,7 +23,7 @@ namespace cyberdog_vision
 
 PersonReID::PersonReID(const std::string & model_path)
 : gpu_id_(0), tracking_id_(0), object_loss_th_(300), library_frame_num_(15), unmatch_count_(0),
-  feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), is_lost_(false), reid_ptr_(nullptr)
+  feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), is_lost_(true), reid_ptr_(nullptr)
 {
   std::cout << "===Init PersonReID===" << std::endl;
   std::string model_reid = model_path + "/reid_v1_mid.engine";
@@ -52,7 +52,7 @@ int PersonReID::SetTracker(
 
 int PersonReID::GetReIDInfo(
   const cv::Mat & img, const std::vector<InferBbox> & body_bboxes,
-  int & id, size_t & index)
+  int & id, cv::Rect & tracked)
 {
   if (tracker_feat_.empty()) {
     std::cout << "Please set tracker before tracking. " << std::endl;
@@ -60,6 +60,8 @@ int PersonReID::GetReIDInfo(
   }
 
   id = -1;
+  tracked = cv::Rect(0, 0, 0, 0);
+  size_t index = 0;
   double max_sim = 0;
   std::vector<float> match_feat;
   for (size_t i = 0; i < body_bboxes.size(); ++i) {
@@ -68,24 +70,23 @@ int PersonReID::GetReIDInfo(
     if (0 != GetFeature(img, body_bboxes[i].body_box, feat)) {
       return -1;
     }
-    if (0 != tracker_feat_.size()) {
-      double sim_val = GetSim(feat, tracker_feat_, SimType::kSimOne2Group);
-      std::cout << "Object " << i << " sim: " << sim_val << std::endl;
-      if (sim_val > max_sim) {
-        index = i;
-        max_sim = sim_val;
-        match_feat.assign(feat.begin(), feat.end());
-      }
-    } else {
-      tracker_feat_.assign(feat.begin(), feat.end());
+
+    double sim_val = GetSim(feat, tracker_feat_, SimType::kSimOne2Group);
+    std::cout << "Object " << i << " sim: " << sim_val << std::endl;
+    if (sim_val > max_sim) {
+      index = i;
+      max_sim = sim_val;
+      match_feat.assign(feat.begin(), feat.end());
     }
   }
 
   if (max_sim > feat_sim_th_) {
     // Match success
-    std::cout << "Match success, sim: " << max_sim << std::endl;
+    std::cout << "Match success, sim: " << max_sim << ", bbox: " << body_bboxes[index].body_box <<
+      std::endl;
     unmatch_count_ = 0;
     id = tracking_id_;
+    tracked = body_bboxes[index].body_box;
     if (max_sim > feat_update_th_) {
       // Update library feat
       if (static_cast<int>(tracker_feat_.size()) / kFeatLen == library_frame_num_) {
@@ -126,7 +127,8 @@ int PersonReID::GetFeature(
   const cv::Mat & img, const cv::Rect & body_box,
   std::vector<float> & reid_feat)
 {
-  cv::Mat reid_img = img(body_box);
+  reid_feat.clear();
+  cv::Mat reid_img = img(body_box).clone();
   XMReIDImage xm_reid_img;
   xm_reid_img.data = reid_img.data;
   xm_reid_img.height = reid_img.rows;
@@ -149,7 +151,7 @@ float PersonReID::GetSim(
   std::vector<float> & feat_det, std::vector<float> & feat_library,
   const SimType & sim_type)
 {
-  double sim_value;
+  float sim_value;
   switch (sim_type) {
     case SimType::kSimOne2One:
       sim_value = REID_GetSimOfOne2One(reid_ptr_, feat_det.data(), feat_library.data());
