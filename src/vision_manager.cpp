@@ -47,6 +47,7 @@ ReturnResultT VisionManager::on_configure(const rclcpp_lifecycle::State & /*stat
   if (0 != Init()) {
     return ReturnResultT::FAILURE;
   }
+  RCLCPP_INFO(get_logger(), "Configuring vision_manager complated. ");
   return ReturnResultT::SUCCESS;
 }
 
@@ -163,7 +164,7 @@ int VisionManager::InitIPC()
 
 void VisionManager::CreateObject()
 {
-  RCLCPP_INFO(get_logger(), "===Create obj. ");
+  RCLCPP_INFO(get_logger(), "===Create object start. ");
   // Create AI object
   body_ptr_ = std::make_shared<BodyDetection>(
     kModelPath + std::string("/body_gesture"));
@@ -185,6 +186,8 @@ void VisionManager::CreateObject()
 
   keypoints_ptr_ = std::make_shared<KeypointsDetection>(
     kModelPath + std::string("/keypoints_detection"));
+
+  RCLCPP_INFO(get_logger(), "===Create object complated. ");
 
   // Create service server
   tracking_service_ = create_service<BodyRegionT>(
@@ -1186,8 +1189,10 @@ void VisionManager::FaceDetProc(std::string face_name)
         checkFacePose_ret = 17;
         face_name = match_info[0].face_id;
         checkFacePose_Msg = "face already in endlib";
-        RCLCPP_ERROR(get_logger(), "%s face already in endlib current score:%f", face_name.c_str(),match_info[0].match_score);
-      }else{
+        RCLCPP_ERROR(
+          get_logger(), "%s face already in endlib current score:%f",
+          face_name.c_str(), match_info[0].match_score);
+      } else {
         FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
       }
     }
@@ -1213,7 +1218,7 @@ bool VisionManager::CallService(
   req->command = cmd;
   req->args = args;
 
-  std::chrono::nanoseconds timeout = std::chrono::nanoseconds(-1);
+  std::chrono::seconds timeout = std::chrono::seconds(10);
   while (!client->wait_for_service(timeout)) {
     if (!rclcpp::ok()) {
       RCLCPP_ERROR(get_logger(), "Interrupted while waiting for the service. Exiting.");

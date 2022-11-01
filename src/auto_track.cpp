@@ -33,6 +33,11 @@ AutoTrack::AutoTrack(const std::string & model_path)
 
 bool AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
 {
+  if (img.empty()) {
+    std::cout << "Image empty set tracker fail." << std::endl;
+    return false;
+  }
+
   XMImage xm_img;
   ImgConvert(img, xm_img);
   fail_count_ = 0;
@@ -47,6 +52,11 @@ bool AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
 
 bool AutoTrack::Track(const cv::Mat & img, cv::Rect & bbox)
 {
+  if (img.empty()) {
+    std::cout << "Image empty cannot track." << std::endl;
+    return false;
+  }
+
   if (!is_init_) {
     std::cout << "Please set tracker before auto track. " << std::endl;
     return false;
