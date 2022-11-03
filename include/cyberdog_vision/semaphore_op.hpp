@@ -16,11 +16,13 @@
 #define CYBERDOG_VISION__SEMAPHORE_OP_HPP_
 
 #include <sys/sem.h>
+#include <time.h>
 #include <errno.h>
 #include <iostream>
 
 #define IPCKEY_PATH "/"
 
+static struct timespec ts = {10, 0};
 namespace cyberdog_vision
 {
 
@@ -77,7 +79,7 @@ inline int WaitSem(int sem_set_id, int sem_index)
   sem_buf.sem_op = -1;
   sem_buf.sem_flg = 0;
 
-  if (semop(sem_set_id, &sem_buf, 1) < 0) {
+  if (semtimedop(sem_set_id, &sem_buf, 1, &ts) < 0) {
     std::cout << "Semaphore P operation fail, error code: " << errno << std::endl;
     return -1;
   }
@@ -93,7 +95,7 @@ inline int SignalSem(int sem_set_id, int sem_index)
   sem_buf.sem_op = 1;
   sem_buf.sem_flg = 0;
 
-  if (semop(sem_set_id, &sem_buf, 1) < 0) {
+  if (semtimedop(sem_set_id, &sem_buf, 1, &ts) < 0) {
     std::cout << "Semaphore V operation fail, error code: " << errno << std::endl;
     return -1;
   }

@@ -26,7 +26,7 @@ PersonReID::PersonReID(const std::string & model_path)
   feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), is_lost_(true), reid_ptr_(nullptr)
 {
   std::cout << "===Init PersonReID===" << std::endl;
-  std::string model_reid = model_path + "/reid_v1_mid.engine";
+  std::string model_reid = model_path + "/reid_v4_mid.engine";
   if (0 != REID_Init(reid_ptr_, model_reid.c_str(), gpu_id_)) {
     throw std::logic_error("Init person reid algo fial. ");
   }
