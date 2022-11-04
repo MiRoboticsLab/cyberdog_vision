@@ -160,22 +160,73 @@ int test_keypoints(const std::vector<cv::String> & file_names)
   return 0;
 }
 
-int test_reid(const std::vector<cv::String> & file_names)
+// int test_reid(const std::vector<cv::String> & file_names)
+int test_reid(const std::string & path)
 {
   std::cout << "===test_reid===" << std::endl;
+  cyberdog_vision::BodyDetection body_ = cyberdog_vision::BodyDetection(
+    kPathPrefix + std::string("/body_gesture"));
   cyberdog_vision::PersonReID reid_ = cyberdog_vision::PersonReID(
     kPathPrefix + std::string("/person_reid"));
-  for (size_t i = 0; i < file_names.size(); i++) {
+
+  cv::VideoCapture cap(path);
+  if (!cap.isOpened()) {
+    return -1;
+  }
+
+  //for (size_t i = 0; i < file_names.size(); i++) {
+  int count = 0;
+  while (true) {
     // For every image
-    std::cout << i << " name: " << file_names[i] << std::endl;
-    cv::Mat img = cv::imread(file_names[i]);
-    std::vector<float> reid_feat;
-    cv::Rect rect = cv::Rect(0, 0, img.cols, img.rows);
-    if (0 != reid_.SetTracker(img, rect, reid_feat)) {
-      std::cout << "Fail. " << std::endl;
+    std::cout << "==========================" << std::endl;
+    //std::cout << file_names[i] << std::endl;
+    //cv::Mat img = cv::imread(file_names[i]);
+    cv::Mat img;
+    cap >> img;
+    if (img.empty()) {
       return -1;
     }
-    std::cout << "extract feat complate. " << std::endl;
+    cv::resize(img, img, cv::Size(640, 480));
+    cyberdog_vision::BodyFrameInfo infos;
+    if (0 != body_.Detect(img, infos)) {
+      return -1;
+    }
+    std::cout << "Frame: " << ++count << ", Det num: " << infos.size() << std::endl;
+    cv::Mat img_show = img.clone();
+
+    if (infos.empty()) {
+      continue;
+    }
+
+    if (reid_.GetLostStatus()) {
+      cv::Rect rect = cv::Rect(infos[0].left, infos[0].top, infos[0].width, infos[0].height);
+      std::vector<float> reid_feat;
+      if (0 != reid_.SetTracker(img, rect, reid_feat)) {
+        std::cout << "Fail. " << std::endl;
+      }
+      std::cout << "extract feat complate. " << std::endl;
+    } else {
+      std::vector<cyberdog_vision::InferBbox> infers;
+      for (size_t i = 0; i < infos.size(); ++i) {
+        cv::Rect rect = cv::Rect(infos[i].left, infos[i].top, infos[i].width, infos[i].height);
+        cyberdog_vision::InferBbox infer;
+        infer.body_box = rect;
+        infers.push_back(infer);
+        cv::rectangle(img_show, rect, cv::Scalar(255, 0, 0));
+      }
+      int id; cv::Rect tracked;
+      if (0 != reid_.GetReIDInfo(img, infers, id, tracked)) {
+        std::cout << "fail" << std::endl;
+      } else {
+        std::cout << "reid: " << id << ", bbox: " << tracked << std::endl;
+        cv::rectangle(img_show, tracked, cv::Scalar(0, 0, 255));
+      }
+    }
+    cv::imshow("reid", img_show);
+    char path[200];
+    sprintf(path, "/SDCARD/reid/result/%d.jpg", count);
+    cv::imwrite(path, img_show);
+    cv::waitKey(10);
   }
   return 0;
 }
@@ -200,7 +251,8 @@ int main(int argc, char * argv[])
   } else if (0 == std::strcmp(argv[1], "keypoints")) {
     test_keypoints(file_names);
   } else if (0 == std::strcmp(argv[1], "reid")) {
-    test_reid(file_names);
+    // test_reid(file_names);
+    test_reid(argv[2]);
   }
 
   return 0;
