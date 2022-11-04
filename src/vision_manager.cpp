@@ -246,24 +246,29 @@ void VisionManager::DestoryThread()
   WakeThread(keypoints_struct_);
 
   {
+    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+    if (!body_results_.is_filled) {
+      body_results_.is_filled = true;
+      body_results_.cond.notify_one();
+    }
+  }
+  if (depend_manager_thread_->joinable()) {
+    depend_manager_thread_->join();
+    RCLCPP_INFO(get_logger(), "depend_manager_thread_ joined. ");
+  }
+
+  {
     std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
-    global_img_buf_.is_filled = true;
-    global_img_buf_.cond.notify_one();
+    if (!global_img_buf_.is_filled) {
+      global_img_buf_.is_filled = true;
+      global_img_buf_.cond.notify_one();
+    }
   }
   if (main_manager_thread_->joinable()) {
     main_manager_thread_->join();
     RCLCPP_INFO(get_logger(), "main_manager_thread_ joined. ");
   }
 
-  {
-    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
-    body_results_.is_filled = true;
-    body_results_.cond.notify_one();
-  }
-  if (depend_manager_thread_->joinable()) {
-    depend_manager_thread_->join();
-    RCLCPP_INFO(get_logger(), "depend_manager_thread_ joined. ");
-  }
   if (img_proc_thread_->joinable()) {
     img_proc_thread_->join();
     RCLCPP_INFO(get_logger(), "img_proc_thread_ joined. ");
@@ -297,8 +302,10 @@ void VisionManager::DestoryThread()
 void VisionManager::WakeThread(AlgoStruct & algo)
 {
   std::unique_lock<std::mutex> lk(algo.mtx);
-  algo.is_called = true;
-  algo.cond.notify_one();
+  if (!algo.is_called) {
+    algo.is_called = true;
+    algo.cond.notify_one();
+  }
 }
 
 void VisionManager::ResetAlgo()
@@ -401,6 +408,7 @@ void VisionManager::MainAlgoManager()
         status_pub_->publish(processing_status_);
       }
     }
+    std::cout << "===end of main thread===" << std::endl;
   }
 }
 
@@ -463,6 +471,7 @@ void VisionManager::DependAlgoManager()
         status_pub_->publish(processing_status_);
       }
     }
+    std::cout << "===end of depend thread===" << std::endl;
   }
 }
 
