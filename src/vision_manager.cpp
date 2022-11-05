@@ -396,7 +396,9 @@ void VisionManager::MainAlgoManager()
       (open_body_ || open_face_ || open_focus_))
     {
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
+      std::cout << "===main thread process_num: " << algo_proc_.process_num << std::endl;
       algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
+      RCLCPP_INFO(get_logger(), "Main thread wake up to pub. ");
       {
         std::unique_lock<std::mutex> lk_result(result_mtx_);
         algo_result_.header.stamp = rclcpp::Clock().now();
@@ -460,10 +462,22 @@ void VisionManager::DependAlgoManager()
     if (open_gesture_ || open_keypoints_ || open_reid_) {
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
       algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
+      RCLCPP_INFO(get_logger(), "Depend thread wake up to pub. ");
       {
         std::unique_lock<std::mutex> lk_result(result_mtx_);
         algo_result_.header.stamp = rclcpp::Clock().now();
         person_pub_->publish(algo_result_);
+        // TODO(lff)： remove log
+        for (size_t i = 0; i < algo_result_.body_info.infos.size(); ++i) {
+          sensor_msgs::msg::RegionOfInterest rect = algo_result_.body_info.infos[i].roi;
+          RCLCPP_INFO(
+            get_logger(), "Publish detection %d bbox: %d,%d,%d,%d", i, rect.x_offset, rect.y_offset, rect.width,
+            rect.height);
+        }
+        sensor_msgs::msg::RegionOfInterest rect = algo_result_.track_res.roi;
+        RCLCPP_INFO(
+          get_logger(), "Publish tracked bbox: %d,%d,%d,%d", rect.x_offset, rect.y_offset, rect.width,
+          rect.height);
         PersonInfoT person_info;
         algo_result_ = person_info;
       }
@@ -567,7 +581,9 @@ void VisionManager::BodyDet()
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       algo_proc_.process_num--;
       Convert(stamped_img.header, infos, algo_result_.body_info);
+      std::cout << "===body thread process_num: " << algo_proc_.process_num << std::endl;
       if (0 == algo_proc_.process_num) {
+        RCLCPP_INFO(get_logger(), "Body thread notify to pub . ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -631,6 +647,7 @@ void VisionManager::FaceRecognize()
       algo_proc_.process_num--;
       Convert(stamped_img.header, result, algo_result_.face_info);
       if (0 == algo_proc_.process_num) {
+        RCLCPP_INFO(get_logger(), "Face thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -693,7 +710,9 @@ void VisionManager::FocusTrack()
       if (is_success) {
         Convert(stamped_img.header, track_res, algo_result_.track_res);
       }
+      std::cout << "===focus thread process_num: " << algo_proc_.process_num << std::endl;
       if (0 == algo_proc_.process_num) {
+        RCLCPP_INFO(get_logger(), "Focus thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -759,6 +778,7 @@ void VisionManager::ReIDProc()
     // ReID and get result
     cv::Mat img_show;
     {
+      RCLCPP_INFO(get_logger(), "Waiting for mutex to reid. ");
       std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
       std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
       img_show = body_results_.detection_img.img.clone();
@@ -790,7 +810,9 @@ void VisionManager::ReIDProc()
       }
       // cv::imshow("reid", img_show);
       // cv::waitKey(10);
+      std::cout << "===reid thread process_num: " << algo_proc_.process_num << std::endl;
       if (0 == algo_proc_.process_num) {
+        RCLCPP_INFO(get_logger(), "Reid thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -852,6 +874,7 @@ void VisionManager::GestureRecognize()
         Convert(infos, algo_result_.body_info);
       }
       if (0 == algo_proc_.process_num) {
+        RCLCPP_INFO(get_logger(), "Gesture thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -928,6 +951,7 @@ void VisionManager::KeypointsDet()
       // Convert data to publish
       Convert(bodies_keypoints, algo_result_.body_info);
       if (0 == algo_proc_.process_num) {
+        RCLCPP_INFO(get_logger(), "Keypoints thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
