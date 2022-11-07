@@ -238,23 +238,9 @@ void VisionManager::CreateThread()
 
 void VisionManager::DestoryThread()
 {
-  WakeThread(body_struct_);
-  WakeThread(face_struct_);
-  WakeThread(focus_struct_);
-  WakeThread(gesture_struct_);
-  WakeThread(reid_struct_);
-  WakeThread(keypoints_struct_);
-
-  {
-    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
-    if (!body_results_.is_filled) {
-      body_results_.is_filled = true;
-      body_results_.cond.notify_one();
-    }
-  }
-  if (depend_manager_thread_->joinable()) {
-    depend_manager_thread_->join();
-    RCLCPP_INFO(get_logger(), "depend_manager_thread_ joined. ");
+  if (img_proc_thread_->joinable()) {
+    img_proc_thread_->join();
+    RCLCPP_INFO(get_logger(), "img_proc_thread_ joined. ");
   }
 
   {
@@ -269,30 +255,49 @@ void VisionManager::DestoryThread()
     RCLCPP_INFO(get_logger(), "main_manager_thread_ joined. ");
   }
 
-  if (img_proc_thread_->joinable()) {
-    img_proc_thread_->join();
-    RCLCPP_INFO(get_logger(), "img_proc_thread_ joined. ");
+  {
+    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+    if (!body_results_.is_filled) {
+      body_results_.is_filled = true;
+      body_results_.cond.notify_one();
+    }
   }
+  if (depend_manager_thread_->joinable()) {
+    depend_manager_thread_->join();
+    RCLCPP_INFO(get_logger(), "depend_manager_thread_ joined. ");
+  }
+
+  WakeThread(body_struct_);
   if (body_det_thread_->joinable()) {
     body_det_thread_->join();
     RCLCPP_INFO(get_logger(), "body_det_thread_ joined. ");
   }
+
+  WakeThread(face_struct_);
   if (face_thread_->joinable()) {
     face_thread_->join();
     RCLCPP_INFO(get_logger(), "face_thread_ joined. ");
   }
+
+  WakeThread(focus_struct_);
   if (focus_thread_->joinable()) {
     focus_thread_->join();
     RCLCPP_INFO(get_logger(), "focus_thread_ joined. ");
   }
+
+  WakeThread(gesture_struct_);
   if (gesture_thread_->joinable()) {
     gesture_thread_->join();
     RCLCPP_INFO(get_logger(), "gesture_thread_ joined. ");
   }
+
+  WakeThread(reid_struct_);
   if (reid_thread_->joinable()) {
     reid_thread_->join();
     RCLCPP_INFO(get_logger(), "reid_thread_ joined. ");
   }
+
+  WakeThread(keypoints_struct_);
   if (keypoints_thread_->joinable()) {
     keypoints_thread_->join();
     RCLCPP_INFO(get_logger(), "keypoints_thread_ joined. ");
