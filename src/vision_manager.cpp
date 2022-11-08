@@ -302,6 +302,12 @@ void VisionManager::DestoryThread()
     keypoints_thread_->join();
     RCLCPP_INFO(get_logger(), "keypoints_thread_ joined. ");
   }
+
+  {
+    std::unique_lock<std::mutex> lk(algo_proc_.mtx);
+    algo_proc_.process_num = 0;
+    RCLCPP_INFO(get_logger(), "Reset process num. ");
+  }
 }
 
 void VisionManager::WakeThread(AlgoStruct & algo)
@@ -408,6 +414,17 @@ void VisionManager::MainAlgoManager()
         std::unique_lock<std::mutex> lk_result(result_mtx_);
         algo_result_.header.stamp = rclcpp::Clock().now();
         person_pub_->publish(algo_result_);
+        // TODO(lff)： remove log
+        for (size_t i = 0; i < algo_result_.body_info.infos.size(); ++i) {
+          sensor_msgs::msg::RegionOfInterest rect = algo_result_.body_info.infos[i].roi;
+          RCLCPP_INFO(
+            get_logger(), "Publish detection %d bbox: %d,%d,%d,%d", i, rect.x_offset, rect.y_offset, rect.width,
+            rect.height);
+        }
+        sensor_msgs::msg::RegionOfInterest rect = algo_result_.track_res.roi;
+        RCLCPP_INFO(
+          get_logger(), "Publish tracked bbox: %d,%d,%d,%d", rect.x_offset, rect.y_offset, rect.width,
+          rect.height);
         PersonInfoT person_info;
         algo_result_ = person_info;
       }
@@ -713,6 +730,9 @@ void VisionManager::FocusTrack()
       algo_proc_.process_num--;
       //  Convert data to publish
       if (is_success) {
+        RCLCPP_INFO(
+          get_logger(), "Focus result %d,%d,%d,%d.", track_res.x, track_res.y, track_res.width,
+          track_res.height);
         Convert(stamped_img.header, track_res, algo_result_.track_res);
       }
       std::cout << "===focus thread process_num: " << algo_proc_.process_num << std::endl;
