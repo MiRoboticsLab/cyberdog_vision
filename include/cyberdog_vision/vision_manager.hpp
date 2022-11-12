@@ -87,6 +87,7 @@ private:
   void CreateThread();
   void DestoryThread();
   void WakeThread(AlgoStruct & algo);
+  void ResetThread(AlgoStruct & algo);
   void ResetAlgo();
   void ImageProc();
   void MainAlgoManager();
