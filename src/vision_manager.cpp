@@ -243,70 +243,67 @@ void VisionManager::DestoryThread()
     RCLCPP_INFO(get_logger(), "img_proc_thread_ joined. ");
   }
 
+  if (gesture_thread_->joinable()) {
+    WakeThread(gesture_struct_);
+    gesture_thread_->join();
+    RCLCPP_INFO(get_logger(), "gesture_thread_ joined. ");
+  }
+
+  if (reid_thread_->joinable()) {
+    WakeThread(reid_struct_);
+    reid_thread_->join();
+    RCLCPP_INFO(get_logger(), "reid_thread_ joined. ");
+  }
+
+  if (keypoints_thread_->joinable()) {
+    WakeThread(keypoints_struct_);
+    keypoints_thread_->join();
+    RCLCPP_INFO(get_logger(), "keypoints_thread_ joined. ");
+  }
+
+  if (face_thread_->joinable()) {
+    WakeThread(face_struct_);
+    face_thread_->join();
+    RCLCPP_INFO(get_logger(), "face_thread_ joined. ");
+  }
+
+  if (focus_thread_->joinable()) {
+    WakeThread(focus_struct_);
+    focus_thread_->join();
+    RCLCPP_INFO(get_logger(), "focus_thread_ joined. ");
+  }
+
+  if (body_det_thread_->joinable()) {
+    WakeThread(body_struct_);
+    body_det_thread_->join();
+    RCLCPP_INFO(get_logger(), "body_det_thread_ joined. ");
+  }
+
   {
+    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
+    algo_proc_.process_num = 0;
+    algo_proc_.cond.notify_one();
+    RCLCPP_INFO(get_logger(), "Destory notify to pub. ");
+  }
+  if (depend_manager_thread_->joinable()) {
+    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+    if (!body_results_.is_filled) {
+      body_results_.is_filled = true;
+      body_results_.cond.notify_one();
+      RCLCPP_INFO(get_logger(), "Destory notify depend thread. ");
+    }
+    depend_manager_thread_->join();
+    RCLCPP_INFO(get_logger(), "depend_manager_thread_ joined. ");
+  }
+
+  if (main_manager_thread_->joinable()) {
     std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
     if (!global_img_buf_.is_filled) {
       global_img_buf_.is_filled = true;
       global_img_buf_.cond.notify_one();
     }
-  }
-  if (main_manager_thread_->joinable()) {
     main_manager_thread_->join();
     RCLCPP_INFO(get_logger(), "main_manager_thread_ joined. ");
-  }
-
-  {
-    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
-    if (!body_results_.is_filled) {
-      body_results_.is_filled = true;
-      body_results_.cond.notify_one();
-    }
-  }
-  if (depend_manager_thread_->joinable()) {
-    depend_manager_thread_->join();
-    RCLCPP_INFO(get_logger(), "depend_manager_thread_ joined. ");
-  }
-
-  WakeThread(body_struct_);
-  if (body_det_thread_->joinable()) {
-    body_det_thread_->join();
-    RCLCPP_INFO(get_logger(), "body_det_thread_ joined. ");
-  }
-
-  WakeThread(face_struct_);
-  if (face_thread_->joinable()) {
-    face_thread_->join();
-    RCLCPP_INFO(get_logger(), "face_thread_ joined. ");
-  }
-
-  WakeThread(focus_struct_);
-  if (focus_thread_->joinable()) {
-    focus_thread_->join();
-    RCLCPP_INFO(get_logger(), "focus_thread_ joined. ");
-  }
-
-  WakeThread(gesture_struct_);
-  if (gesture_thread_->joinable()) {
-    gesture_thread_->join();
-    RCLCPP_INFO(get_logger(), "gesture_thread_ joined. ");
-  }
-
-  WakeThread(reid_struct_);
-  if (reid_thread_->joinable()) {
-    reid_thread_->join();
-    RCLCPP_INFO(get_logger(), "reid_thread_ joined. ");
-  }
-
-  WakeThread(keypoints_struct_);
-  if (keypoints_thread_->joinable()) {
-    keypoints_thread_->join();
-    RCLCPP_INFO(get_logger(), "keypoints_thread_ joined. ");
-  }
-
-  {
-    std::unique_lock<std::mutex> lk(algo_proc_.mtx);
-    algo_proc_.process_num = 0;
-    RCLCPP_INFO(get_logger(), "Reset process num. ");
   }
 }
 
@@ -319,6 +316,12 @@ void VisionManager::WakeThread(AlgoStruct & algo)
   }
 }
 
+void VisionManager::ResetThread(AlgoStruct & algo)
+{
+  std::unique_lock<std::mutex> lk(algo.mtx);
+  algo.is_called = false;
+}
+
 void VisionManager::ResetAlgo()
 {
   focus_ptr_->ResetTracker();
@@ -329,6 +332,20 @@ void VisionManager::ResetAlgo()
   open_keypoints_ = false;
   open_reid_ = false;
   open_focus_ = false;
+  ResetThread(body_struct_);
+  ResetThread(face_struct_);
+  ResetThread(focus_struct_);
+  ResetThread(reid_struct_);
+  ResetThread(gesture_struct_);
+  ResetThread(keypoints_struct_);
+  {
+    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+    body_results_.is_filled = false;
+  }
+  {
+    std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+    global_img_buf_.is_filled = false;
+  }
 }
 
 void VisionManager::ImageProc()
@@ -804,7 +821,7 @@ void VisionManager::ReIDProc()
     cv::Mat img_show;
     {
       RCLCPP_INFO(get_logger(), "Waiting for mutex to reid. ");
-      std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx);
       std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
       img_show = body_results_.detection_img.img.clone();
       if (-1 !=
@@ -867,7 +884,7 @@ void VisionManager::GestureRecognize()
     bool is_success = false;
     std::vector<GestureInfo> infos;
     {
-      std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx);
       std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
       if (-1 != gesture_ptr_->GetGestureInfo(body_results_.detection_img.img, body_bboxes, infos)) {
         is_success = true;
@@ -952,7 +969,7 @@ void VisionManager::KeypointsDet()
     // Keypoints detection and get result
     std::vector<std::vector<cv::Point2f>> bodies_keypoints;
     {
-      std::unique_lock<std::mutex> lk_body(body_results_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx);
       std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
       keypoints_ptr_->GetKeypointsInfo(
         body_results_.detection_img.img, body_bboxes,
@@ -1245,7 +1262,7 @@ void VisionManager::FaceDetProc(std::string face_name)
 
   while (std::difftime(std::time(NULL), cur_time) < 40 && face_detect_) {
     get_face_timeout = false;
-    std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
+    std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx);
     global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
     global_img_buf_.is_filled = false;
 
