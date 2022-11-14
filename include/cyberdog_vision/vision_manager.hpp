@@ -185,6 +185,15 @@ private:
   bool open_focus_;
   bool is_activate_;
   bool face_detect_;
+
+  bool main_algo_deactivated_;
+  bool depend_deactivated_;
+  bool body_deactivated_;
+  bool face_deactivated_;
+  bool focus_deactivated_;
+  bool reid_deactivated_;
+  bool gesture_deactivated_;
+  bool keypoints_deactivated_;
 };
 
 }  // namespace cyberdog_vision
