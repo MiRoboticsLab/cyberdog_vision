@@ -36,7 +36,10 @@ namespace cyberdog_vision
 VisionManager::VisionManager()
 : rclcpp_lifecycle::LifecycleNode("vision_manager"), shm_addr_(nullptr), buf_size_(6),
   open_face_(false), open_body_(false), open_gesture_(false), open_keypoints_(false),
-  open_reid_(false), open_focus_(false), is_activate_(false)
+  open_reid_(false), open_focus_(false), is_activate_(false),
+  main_algo_deactivated_(false), depend_deactivated_(false), body_deactivated_(false),
+  face_deactivated_(false), focus_deactivated_(false), reid_deactivated_(false),
+  gesture_deactivated_(false), keypoints_deactivated_(false)
 {
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 }
@@ -244,37 +247,49 @@ void VisionManager::DestoryThread()
   }
 
   if (gesture_thread_->joinable()) {
-    WakeThread(gesture_struct_);
+    if (!gesture_deactivated_) {
+      WakeThread(gesture_struct_);
+    }
     gesture_thread_->join();
     RCLCPP_INFO(get_logger(), "gesture_thread_ joined. ");
   }
 
   if (reid_thread_->joinable()) {
-    WakeThread(reid_struct_);
+    if (!reid_deactivated_) {
+      WakeThread(reid_struct_);
+    }
     reid_thread_->join();
     RCLCPP_INFO(get_logger(), "reid_thread_ joined. ");
   }
 
   if (keypoints_thread_->joinable()) {
-    WakeThread(keypoints_struct_);
+    if (!keypoints_deactivated_) {
+      WakeThread(keypoints_struct_);
+    }
     keypoints_thread_->join();
     RCLCPP_INFO(get_logger(), "keypoints_thread_ joined. ");
   }
 
   if (face_thread_->joinable()) {
-    WakeThread(face_struct_);
+    if (!face_deactivated_) {
+      WakeThread(face_struct_);
+    }
     face_thread_->join();
     RCLCPP_INFO(get_logger(), "face_thread_ joined. ");
   }
 
   if (focus_thread_->joinable()) {
-    WakeThread(focus_struct_);
+    if (!focus_deactivated_) {
+      WakeThread(focus_struct_);
+    }
     focus_thread_->join();
     RCLCPP_INFO(get_logger(), "focus_thread_ joined. ");
   }
 
   if (body_det_thread_->joinable()) {
-    WakeThread(body_struct_);
+    if (!body_deactivated_) {
+      WakeThread(body_struct_);
+    }
     body_det_thread_->join();
     RCLCPP_INFO(get_logger(), "body_det_thread_ joined. ");
   }
@@ -286,21 +301,25 @@ void VisionManager::DestoryThread()
     RCLCPP_INFO(get_logger(), "Destory notify to pub. ");
   }
   if (depend_manager_thread_->joinable()) {
-    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
-    if (!body_results_.is_filled) {
-      body_results_.is_filled = true;
-      body_results_.cond.notify_one();
-      RCLCPP_INFO(get_logger(), "Destory notify depend thread. ");
+    if (!depend_deactivated_) {
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+      if (!body_results_.is_filled) {
+        body_results_.is_filled = true;
+        body_results_.cond.notify_one();
+        RCLCPP_INFO(get_logger(), "Destory notify depend thread. ");
+      }
     }
     depend_manager_thread_->join();
     RCLCPP_INFO(get_logger(), "depend_manager_thread_ joined. ");
   }
 
   if (main_manager_thread_->joinable()) {
-    std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
-    if (!global_img_buf_.is_filled) {
-      global_img_buf_.is_filled = true;
-      global_img_buf_.cond.notify_one();
+    if (!main_algo_deactivated_) {
+      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+      if (!global_img_buf_.is_filled) {
+        global_img_buf_.is_filled = true;
+        global_img_buf_.cond.notify_one();
+      }
     }
     main_manager_thread_->join();
     RCLCPP_INFO(get_logger(), "main_manager_thread_ joined. ");
@@ -332,6 +351,14 @@ void VisionManager::ResetAlgo()
   open_keypoints_ = false;
   open_reid_ = false;
   open_focus_ = false;
+  main_algo_deactivated_ = false;
+  depend_deactivated_ = false;
+  body_deactivated_ = false;
+  face_deactivated_ = false;
+  focus_deactivated_ = false;
+  reid_deactivated_ = false;
+  gesture_deactivated_ = false;
+  keypoints_deactivated_ = false;
   ResetThread(body_struct_);
   ResetThread(face_struct_);
   ResetThread(focus_struct_);
@@ -346,12 +373,19 @@ void VisionManager::ResetAlgo()
     std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
     global_img_buf_.is_filled = false;
   }
+  {
+    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
+    algo_proc_.process_num = 0;
+  }
 }
 
 void VisionManager::ImageProc()
 {
   while (rclcpp::ok()) {
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return image thread. " << std::endl;
+      return;
+    }
     if (0 != WaitSem(sem_set_id_, 2)) {return;}
     if (0 != WaitSem(sem_set_id_, 0)) {return;}
     StampedImage simg;
@@ -371,6 +405,7 @@ void VisionManager::ImageProc()
       global_img_buf_.img_buf.push_back(simg);
       global_img_buf_.is_filled = true;
       global_img_buf_.cond.notify_one();
+      std::cout << "===Notify main thread. " << std::endl;
     }
   }
 }
@@ -379,12 +414,17 @@ void VisionManager::MainAlgoManager()
 {
   while (rclcpp::ok()) {
     {
+      std::cout << "===Wait to activate main thread. " << std::endl;
       std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
       global_img_buf_.cond.wait(lk, [this] {return global_img_buf_.is_filled;});
       global_img_buf_.is_filled = false;
       std::cout << "===Activate main algo manager thread. " << std::endl;
     }
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return main algo thread. " << std::endl;
+      main_algo_deactivated_ = true;
+      return;
+    }
 
     if (open_body_) {
       std::lock(algo_proc_.mtx, body_struct_.mtx);
@@ -457,12 +497,17 @@ void VisionManager::DependAlgoManager()
 {
   while (rclcpp::ok()) {
     {
+      std::cout << "===Wait to activate depend thread. " << std::endl;
       std::unique_lock<std::mutex> lk(body_results_.mtx);
       body_results_.cond.wait(lk, [this] {return body_results_.is_filled;});
       body_results_.is_filled = false;
       std::cout << "===Activate depend algo manager thread. " << std::endl;
     }
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return depend thread. " << std::endl;
+      depend_deactivated_ = true;
+      return;
+    }
 
     if (open_reid_) {
       std::lock(algo_proc_.mtx, reid_struct_.mtx);
@@ -563,12 +608,17 @@ void VisionManager::BodyDet()
 {
   while (rclcpp::ok()) {
     {
+      std::cout << "===Wait to activate body thread. " << std::endl;
       std::unique_lock<std::mutex> lk_struct(body_struct_.mtx);
       body_struct_.cond.wait(lk_struct, [this] {return body_struct_.is_called;});
       body_struct_.is_called = false;
       std::cout << "===Activate body detect thread. " << std::endl;
     }
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return body thread. " << std::endl;
+      body_deactivated_ = true;
+      return;
+    }
 
     // Get image and detect body
     StampedImage stamped_img;
@@ -589,6 +639,7 @@ void VisionManager::BodyDet()
         body_results_.detection_img.header = stamped_img.header;
         body_results_.is_filled = true;
         body_results_.cond.notify_one();
+        std::cout << "Body thread notify depend thread." << std::endl;
 
         RCLCPP_INFO(get_logger(), "Body detection num: %d", infos.size());
         for (size_t count = 0; count < infos.size(); ++count) {
@@ -658,12 +709,17 @@ void VisionManager::FaceRecognize()
 {
   while (rclcpp::ok()) {
     {
+      std::cout << "===Wait to activate face thread. " << std::endl;
       std::unique_lock<std::mutex> lk(face_struct_.mtx);
       face_struct_.cond.wait(lk, [this] {return face_struct_.is_called;});
       face_struct_.is_called = false;
       std::cout << "===Activate face recognition thread. " << std::endl;
     }
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return face thread. " << std::endl;
+      face_deactivated_ = true;
+      return;
+    }
 
     // Get image to proc
     StampedImage stamped_img;
@@ -704,12 +760,17 @@ void VisionManager::FocusTrack()
 {
   while (rclcpp::ok()) {
     {
+      std::cout << "===Wait to activate focus thread. " << std::endl;
       std::unique_lock<std::mutex> lk(focus_struct_.mtx);
       focus_struct_.cond.wait(lk, [this] {return focus_struct_.is_called;});
       focus_struct_.is_called = false;
       std::cout << "===Activate focus thread. " << std::endl;
     }
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return focus thread. " << std::endl;
+      focus_deactivated_ = true;
+      return;
+    }
 
     // Get image to proc
     StampedImage stamped_img;
@@ -810,12 +871,17 @@ void VisionManager::ReIDProc()
     int person_id = -1;
     cv::Rect tracked_bbox;
     {
+      std::cout << "===Wait to activate reid thread. " << std::endl;
       std::unique_lock<std::mutex> lk_reid(reid_struct_.mtx);
       reid_struct_.cond.wait(lk_reid, [this] {return reid_struct_.is_called;});
       reid_struct_.is_called = false;
       std::cout << "===Activate reid thread. " << std::endl;
     }
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return reid thread. " << std::endl;
+      reid_deactivated_ = true;
+      return;
+    }
 
     // ReID and get result
     cv::Mat img_show;
@@ -873,12 +939,17 @@ void VisionManager::GestureRecognize()
 {
   while (rclcpp::ok()) {
     {
+      std::cout << "===Wait to activate gesture thread. " << std::endl;
       std::unique_lock<std::mutex> lk(gesture_struct_.mtx);
       gesture_struct_.cond.wait(lk, [this] {return gesture_struct_.is_called;});
       gesture_struct_.is_called = false;
       std::cout << "===Activate gesture recognition thread. " << std::endl;
     }
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return gesture thread. " << std::endl;
+      gesture_deactivated_ = true;
+      return;
+    }
 
     // Gesture recognition and get result
     bool is_success = false;
@@ -959,12 +1030,17 @@ void VisionManager::KeypointsDet()
 {
   while (rclcpp::ok()) {
     {
+      std::cout << "===Wait to activate keypoints thread. " << std::endl;
       std::unique_lock<std::mutex> lk(keypoints_struct_.mtx);
       keypoints_struct_.cond.wait(lk, [this] {return keypoints_struct_.is_called;});
       keypoints_struct_.is_called = false;
       std::cout << "===Activate keypoints detection thread. " << std::endl;
     }
-    if (!is_activate_) {return;}
+    if (!is_activate_) {
+      std::cout << "===Deactivate to return keypoints thread. " << std::endl;
+      keypoints_deactivated_ = true;
+      return;
+    }
 
     // Keypoints detection and get result
     std::vector<std::vector<cv::Point2f>> bodies_keypoints;
