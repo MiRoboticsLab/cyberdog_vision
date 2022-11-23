@@ -27,7 +27,7 @@ AutoTrack::AutoTrack(const std::string & model_path)
   std::cout << "===Init AutoTrack===" << std::endl;
   std::string backbone_path = model_path + "/test_backbone.onnx";
   std::string head_path = model_path + "/test_rpn.onnx";
-  std::string reid_path = model_path + "/any_reid_v2_sim.onnx";
+  std::string reid_path = model_path + "/any_reid_v3_sim.onnx";
   tracker_ptr_ = std::make_shared<TRACKER::Tracker>(backbone_path, head_path, reid_path, gpu_id_);
 }
 

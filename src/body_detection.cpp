@@ -51,6 +51,10 @@ int BodyDetection::Detect(const cv::Mat & img, BodyFrameInfo & infos)
 }
 
 BodyDetection::~BodyDetection()
-{}
+{
+  if (body_ptr_ != nullptr) {
+    body_ptr_->Close();
+  }
+}
 
 }  // namespace cyberdog_vision
