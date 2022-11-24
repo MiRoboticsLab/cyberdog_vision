@@ -15,9 +15,11 @@
 #include <memory>
 
 #include "cyberdog_vision/vision_manager.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 int main(int argc, char * argv[])
 {
+  LOGGER_MAIN_INSTANCE("vision_manager");
   rclcpp::init(argc, argv);
   auto node = std::make_shared<cyberdog_vision::VisionManager>();
   rclcpp::executors::MultiThreadedExecutor exec_;

@@ -30,6 +30,7 @@ add_subdirectory(3rdparty)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
+find_package(cyberdog_common REQUIRED)
 find_package(protocol REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 find_package(CUDA REQUIRED)
@@ -83,6 +84,7 @@ ament_target_dependencies(vision_manager
   XMTRACK
   rclcpp
   rclcpp_lifecycle
+  cyberdog_common
   protocol
   OpenCV
   CUDA
@@ -96,6 +98,7 @@ ament_target_dependencies(test_ai
   XMTRACK
   rclcpp
   rclcpp_lifecycle
+  cyberdog_common
   protocol
   OpenCV
   CUDA

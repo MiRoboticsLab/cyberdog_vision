@@ -17,6 +17,7 @@
 #include <map>
 
 #include "cyberdog_vision/face_recognition.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog_vision
 {
@@ -24,7 +25,7 @@ namespace cyberdog_vision
 FaceRecognition::FaceRecognition(
   const std::string & model_path, bool open_emotion, bool open_age)
 {
-  std::cout << "===Init FaceRecognition===" << std::endl;
+  INFO("===Init FaceRecognition===");
   face_ptr_ = XMFaceAPI::Create();
 
   FaceParam param;
@@ -39,7 +40,7 @@ FaceRecognition::FaceRecognition(
 
   std::string version;
   if (!face_ptr_->getVersion(version)) {
-    std::cout << "Version of face sdk is " << version << std::endl;
+    INFO("Version of face sdk is %s", version.c_str());
   }
 }
 

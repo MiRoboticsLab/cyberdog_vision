@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "cyberdog_vision/gesture_recognition.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog_vision
 {
@@ -24,7 +25,7 @@ namespace cyberdog_vision
 GestureRecognition::GestureRecognition(const std::string & model_path)
 : max_person_num_(5)
 {
-  std::cout << "===Init GestureRecognition===" << std::endl;
+  INFO("===Init GestureRecognition===");
   std::string model_det = model_path + "/hand_detect_1118_FP16.plan";
   std::string model_cls = model_path + "/hand_gesture_recognition_FP16.plan";
   gesture_ptr_ = std::make_shared<handgesture::Hand_Gesture>(model_det, model_cls);
@@ -36,7 +37,7 @@ int GestureRecognition::GetGestureInfo(
   std::vector<GestureInfo> & infos)
 {
   if (body_boxes.empty()) {
-    std::cout << "Have no body to detect gesture. " << std::endl;
+    WARN("Have no body to detect gesture. ");
     return -1;
   }
 
@@ -62,7 +63,7 @@ int GestureRecognition::GetGestureInfo(
       gesture_infos[i].left, gesture_infos[i].top,
       gesture_infos[i].right - gesture_infos[i].left,
       gesture_infos[i].bottom - gesture_infos[i].top);
-    std::cout << "gesture: " << gesture_infos[i].left << std::endl;
+    INFO("gesture: %d", gesture_infos[i].left);
     info.label = gesture_infos[i].gestureLabel;
     infos.push_back(info);
   }

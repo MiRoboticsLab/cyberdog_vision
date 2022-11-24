@@ -17,6 +17,7 @@
 
 #include "cyberdog_vision/auto_track.hpp"
 #include "cyberdog_vision/common_type.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog_vision
 {
@@ -24,7 +25,7 @@ namespace cyberdog_vision
 AutoTrack::AutoTrack(const std::string & model_path)
 : gpu_id_(0), loss_th_(300), fail_count_(0), is_init_(false), is_lost_(false)
 {
-  std::cout << "===Init AutoTrack===" << std::endl;
+  INFO("===Init AutoTrack===");
   std::string backbone_path = model_path + "/test_backbone.onnx";
   std::string head_path = model_path + "/test_rpn.onnx";
   std::string reid_path = model_path + "/any_reid_v3_sim.onnx";
@@ -34,7 +35,7 @@ AutoTrack::AutoTrack(const std::string & model_path)
 bool AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
 {
   if (img.empty()) {
-    std::cout << "Image empty set tracker fail." << std::endl;
+    WARN("Image empty set tracker fail.");
     return false;
   }
 
@@ -45,7 +46,7 @@ bool AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
   if (is_success) {
     is_init_ = true;
     is_lost_ = false;
-    std::cout << "set auto track success." << std::endl;
+    INFO("Set auto track success.");
   }
   return is_success;
 }
@@ -53,12 +54,12 @@ bool AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
 bool AutoTrack::Track(const cv::Mat & img, cv::Rect & bbox)
 {
   if (img.empty()) {
-    std::cout << "Image empty cannot track." << std::endl;
+    WARN("Image empty cannot track.");
     return false;
   }
 
   if (!is_init_) {
-    std::cout << "Please set tracker before auto track. " << std::endl;
+    WARN("Please set tracker before auto track. ");
     return false;
   }
 
@@ -69,7 +70,7 @@ bool AutoTrack::Track(const cv::Mat & img, cv::Rect & bbox)
   if (!track_box.track_sucess) {
     fail_count_++;
     if (fail_count_ > loss_th_) {
-      std::cout << "Object lost, please set tracker to restart. " << std::endl;
+      WARN("Object lost, please set tracker to restart. ");
       is_init_ = false;
       is_lost_ = true;
     }

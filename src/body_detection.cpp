@@ -16,6 +16,7 @@
 #include <memory>
 
 #include "cyberdog_vision/body_detection.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog_vision
 {
@@ -23,7 +24,7 @@ namespace cyberdog_vision
 BodyDetection::BodyDetection(const std::string & model_path)
 : gpu_id_(0)
 {
-  std::cout << "===Init BodyDetection===" << std::endl;
+  INFO("===Init BodyDetection===");
   std::string model_det = model_path + "/detect.onnx";
   std::string model_cls = model_path + "/cls_human_mid.onnx";
   body_ptr_ = std::make_shared<ContentMotionAPI>();
@@ -35,7 +36,7 @@ BodyDetection::BodyDetection(const std::string & model_path)
 int BodyDetection::Detect(const cv::Mat & img, BodyFrameInfo & infos)
 {
   if (img.empty()) {
-    std::cout << "Image is empty cannot perform detection. " << std::endl;
+    WARN("Image is empty cannot perform detection. ");
     return -1;
   }
 
@@ -43,7 +44,7 @@ int BodyDetection::Detect(const cv::Mat & img, BodyFrameInfo & infos)
   ImgConvert(img, xm_img);
   struct LogInfo log_info;
   if (0 != body_ptr_->GetContentMotionAnalyse(xm_img, infos, log_info, gpu_id_)) {
-    std::cout << "Detacte body fail. " << std::endl;
+    WARN("Detacte body fail. ");
     return -1;
   }
 
