@@ -23,6 +23,7 @@
 
 #include "cyberdog_vision/vision_manager.hpp"
 #include "cyberdog_vision/semaphore_op.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 #define SHM_PROJ_ID 'A'
 #define SEM_PROJ_ID 'B'
@@ -46,54 +47,54 @@ VisionManager::VisionManager()
 
 ReturnResultT VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Configuring vision_manager. ");
+  INFO("Configuring vision_manager. ");
   if (0 != Init()) {
     return ReturnResultT::FAILURE;
   }
-  RCLCPP_INFO(get_logger(), "Configure complated. ");
+  INFO("Configure complated. ");
   return ReturnResultT::SUCCESS;
 }
 
 ReturnResultT VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Activating vision_manager. ");
+  INFO("Activating vision_manager. ");
   if (!CallService(camera_clinet_, 0, "face-interval=1")) {
-    RCLCPP_ERROR(get_logger(), "Start camera stream fail. ");
+    ERROR("Start camera stream fail. ");
     return ReturnResultT::FAILURE;
   }
-  RCLCPP_INFO(get_logger(), "Start camera stream success. ");
+  INFO("Start camera stream success. ");
   is_activate_ = true;
   CreateThread();
   person_pub_->on_activate();
   status_pub_->on_activate();
   face_result_pub_->on_activate();
   processing_status_.status = TrackingStatusT::STATUS_SELECTING;
-  RCLCPP_INFO(get_logger(), "Activate complated. ");
+  INFO("Activate complated. ");
   return ReturnResultT::SUCCESS;
 }
 
 ReturnResultT VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Deactivating vision_manager. ");
+  INFO("Deactivating vision_manager. ");
   is_activate_ = false;
   DestoryThread();
   ResetAlgo();
-  RCLCPP_INFO(get_logger(), "Destory thread complated. ");
+  INFO("Destory thread complated. ");
   if (!CallService(camera_clinet_, 0, "face-interval=0")) {
-    RCLCPP_ERROR(get_logger(), "Close camera stream fail. ");
+    ERROR("Close camera stream fail. ");
     return ReturnResultT::FAILURE;
   }
-  RCLCPP_INFO(get_logger(), "Close camera stream success. ");
+  INFO("Close camera stream success. ");
   person_pub_->on_deactivate();
   status_pub_->on_deactivate();
   face_result_pub_->on_deactivate();
-  RCLCPP_INFO(get_logger(), "Deactivate success. ");
+  INFO("Deactivate success. ");
   return ReturnResultT::SUCCESS;
 }
 
 ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Cleaning up vision_manager. ");
+  INFO("Cleaning up vision_manager. ");
   img_proc_thread_.reset();
   main_manager_thread_.reset();
   depend_manager_thread_.reset();
@@ -116,20 +117,20 @@ ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*
   gesture_ptr_.reset();
   reid_ptr_.reset();
   keypoints_ptr_.reset();
-  RCLCPP_INFO(get_logger(), "Clean up complated. ");
+  INFO("Clean up complated. ");
   return ReturnResultT::SUCCESS;
 }
 
 ReturnResultT VisionManager::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Shutting down vision_manager. ");
+  INFO("Shutting down vision_manager. ");
   return ReturnResultT::SUCCESS;
 }
 
 int VisionManager::Init()
 {
   if (0 != InitIPC()) {
-    RCLCPP_ERROR(get_logger(), "Init shared memory or semaphore fail. ");
+    ERROR("Init shared memory or semaphore fail. ");
     return -1;
   }
 
@@ -173,7 +174,7 @@ int VisionManager::InitIPC()
 
 void VisionManager::CreateObject()
 {
-  RCLCPP_INFO(get_logger(), "===Create object start. ");
+  INFO("===Create object start. ");
   // Create AI object
   body_ptr_ = std::make_shared<BodyDetection>(
     kModelPath + std::string("/body_gesture"));
@@ -196,7 +197,7 @@ void VisionManager::CreateObject()
   keypoints_ptr_ = std::make_shared<KeypointsDetection>(
     kModelPath + std::string("/keypoints_detection"));
 
-  RCLCPP_INFO(get_logger(), "===Create object complated. ");
+  INFO("===Create object complated. ");
 
   // Create service server
   tracking_service_ = create_service<BodyRegionT>(
@@ -243,7 +244,7 @@ void VisionManager::DestoryThread()
 {
   if (img_proc_thread_->joinable()) {
     img_proc_thread_->join();
-    RCLCPP_INFO(get_logger(), "img_proc_thread_ joined. ");
+    INFO("img_proc_thread_ joined. ");
   }
 
   if (gesture_thread_->joinable()) {
@@ -251,7 +252,7 @@ void VisionManager::DestoryThread()
       WakeThread(gesture_struct_);
     }
     gesture_thread_->join();
-    RCLCPP_INFO(get_logger(), "gesture_thread_ joined. ");
+    INFO("gesture_thread_ joined. ");
   }
 
   if (reid_thread_->joinable()) {
@@ -259,7 +260,7 @@ void VisionManager::DestoryThread()
       WakeThread(reid_struct_);
     }
     reid_thread_->join();
-    RCLCPP_INFO(get_logger(), "reid_thread_ joined. ");
+    INFO("reid_thread_ joined. ");
   }
 
   if (keypoints_thread_->joinable()) {
@@ -267,7 +268,7 @@ void VisionManager::DestoryThread()
       WakeThread(keypoints_struct_);
     }
     keypoints_thread_->join();
-    RCLCPP_INFO(get_logger(), "keypoints_thread_ joined. ");
+    INFO("keypoints_thread_ joined. ");
   }
 
   if (face_thread_->joinable()) {
@@ -275,7 +276,7 @@ void VisionManager::DestoryThread()
       WakeThread(face_struct_);
     }
     face_thread_->join();
-    RCLCPP_INFO(get_logger(), "face_thread_ joined. ");
+    INFO("face_thread_ joined. ");
   }
 
   if (focus_thread_->joinable()) {
@@ -283,7 +284,7 @@ void VisionManager::DestoryThread()
       WakeThread(focus_struct_);
     }
     focus_thread_->join();
-    RCLCPP_INFO(get_logger(), "focus_thread_ joined. ");
+    INFO("focus_thread_ joined. ");
   }
 
   if (body_det_thread_->joinable()) {
@@ -291,14 +292,14 @@ void VisionManager::DestoryThread()
       WakeThread(body_struct_);
     }
     body_det_thread_->join();
-    RCLCPP_INFO(get_logger(), "body_det_thread_ joined. ");
+    INFO("body_det_thread_ joined. ");
   }
 
   {
     std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
     algo_proc_.process_num = 0;
     algo_proc_.cond.notify_one();
-    RCLCPP_INFO(get_logger(), "Destory notify to pub. ");
+    INFO("Destory notify to pub. ");
   }
   if (depend_manager_thread_->joinable()) {
     if (!depend_deactivated_) {
@@ -306,11 +307,11 @@ void VisionManager::DestoryThread()
       if (!body_results_.is_filled) {
         body_results_.is_filled = true;
         body_results_.cond.notify_one();
-        RCLCPP_INFO(get_logger(), "Destory notify depend thread. ");
+        INFO("Destory notify depend thread. ");
       }
     }
     depend_manager_thread_->join();
-    RCLCPP_INFO(get_logger(), "depend_manager_thread_ joined. ");
+    INFO("depend_manager_thread_ joined. ");
   }
 
   if (main_manager_thread_->joinable()) {
@@ -322,7 +323,7 @@ void VisionManager::DestoryThread()
       }
     }
     main_manager_thread_->join();
-    RCLCPP_INFO(get_logger(), "main_manager_thread_ joined. ");
+    INFO("main_manager_thread_ joined. ");
   }
 }
 
@@ -466,7 +467,7 @@ void VisionManager::MainAlgoManager()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
       std::cout << "===main thread process_num: " << algo_proc_.process_num << std::endl;
       algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
-      RCLCPP_INFO(get_logger(), "Main thread wake up to pub. ");
+      INFO("Main thread wake up to pub. ");
       {
         std::unique_lock<std::mutex> lk_result(result_mtx_);
         algo_result_.header.stamp = rclcpp::Clock().now();
@@ -474,13 +475,13 @@ void VisionManager::MainAlgoManager()
         // TODO(lff)： remove log
         for (size_t i = 0; i < algo_result_.body_info.infos.size(); ++i) {
           sensor_msgs::msg::RegionOfInterest rect = algo_result_.body_info.infos[i].roi;
-          RCLCPP_INFO(
-            get_logger(), "Publish detection %d bbox: %d,%d,%d,%d", i, rect.x_offset, rect.y_offset, rect.width,
+          INFO(
+            "Publish detection %d bbox: %d,%d,%d,%d", i, rect.x_offset, rect.y_offset, rect.width,
             rect.height);
         }
         sensor_msgs::msg::RegionOfInterest rect = algo_result_.track_res.roi;
-        RCLCPP_INFO(
-          get_logger(), "Publish tracked bbox: %d,%d,%d,%d", rect.x_offset, rect.y_offset, rect.width,
+        INFO(
+          "Publish tracked bbox: %d,%d,%d,%d", rect.x_offset, rect.y_offset, rect.width,
           rect.height);
         PersonInfoT person_info;
         algo_result_ = person_info;
@@ -546,7 +547,7 @@ void VisionManager::DependAlgoManager()
     if (open_gesture_ || open_keypoints_ || open_reid_) {
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
       algo_proc_.cond.wait(lk_proc, [this] {return 0 == algo_proc_.process_num;});
-      RCLCPP_INFO(get_logger(), "Depend thread wake up to pub. ");
+      INFO("Depend thread wake up to pub. ");
       {
         std::unique_lock<std::mutex> lk_result(result_mtx_);
         algo_result_.header.stamp = rclcpp::Clock().now();
@@ -554,13 +555,13 @@ void VisionManager::DependAlgoManager()
         // TODO(lff)： remove log
         for (size_t i = 0; i < algo_result_.body_info.infos.size(); ++i) {
           sensor_msgs::msg::RegionOfInterest rect = algo_result_.body_info.infos[i].roi;
-          RCLCPP_INFO(
-            get_logger(), "Publish detection %d bbox: %d,%d,%d,%d", i, rect.x_offset, rect.y_offset, rect.width,
+          INFO(
+            "Publish detection %d bbox: %d,%d,%d,%d", i, rect.x_offset, rect.y_offset, rect.width,
             rect.height);
         }
         sensor_msgs::msg::RegionOfInterest rect = algo_result_.track_res.roi;
-        RCLCPP_INFO(
-          get_logger(), "Publish tracked bbox: %d,%d,%d,%d", rect.x_offset, rect.y_offset, rect.width,
+        INFO(
+          "Publish tracked bbox: %d,%d,%d,%d", rect.x_offset, rect.y_offset, rect.width,
           rect.height);
         PersonInfoT person_info;
         algo_result_ = person_info;
@@ -641,10 +642,10 @@ void VisionManager::BodyDet()
         body_results_.cond.notify_one();
         std::cout << "Body thread notify depend thread." << std::endl;
 
-        RCLCPP_INFO(get_logger(), "Body detection num: %d", infos.size());
+        INFO("Body detection num: %d", infos.size());
         for (size_t count = 0; count < infos.size(); ++count) {
-          RCLCPP_INFO(
-            get_logger(), "Person %d: sim: %f, x: %d", count, infos[count].score,
+          INFO(
+            "Person %d: sim: %f, x: %d", count, infos[count].score,
             infos[count].left);
         }
 
@@ -660,7 +661,7 @@ void VisionManager::BodyDet()
         // cv::imshow("vision", img_show);
         // cv::waitKey(10);
       } else {
-        RCLCPP_WARN(get_logger(), "Body detect fail of current image. ");
+        WARN("Body detect fail of current image. ");
       }
     }
 
@@ -673,7 +674,7 @@ void VisionManager::BodyDet()
       Convert(stamped_img.header, infos, algo_result_.body_info);
       std::cout << "===body thread process_num: " << algo_proc_.process_num << std::endl;
       if (0 == algo_proc_.process_num) {
-        RCLCPP_INFO(get_logger(), "Body thread notify to pub . ");
+        INFO("Body thread notify to pub . ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -731,7 +732,7 @@ void VisionManager::FaceRecognize()
     // Face recognition and get result
     std::vector<MatchFaceInfo> result;
     if (0 != face_ptr_->GetRecognitionResult(stamped_img.img, face_library_, result)) {
-      RCLCPP_WARN(get_logger(), "Face recognition fail. ");
+      WARN("Face recognition fail. ");
     }
 
     // Storage face recognition result
@@ -742,7 +743,7 @@ void VisionManager::FaceRecognize()
       algo_proc_.process_num--;
       Convert(stamped_img.header, result, algo_result_.face_info);
       if (0 == algo_proc_.process_num) {
-        RCLCPP_INFO(get_logger(), "Face thread notify to pub. ");
+        INFO("Face thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -783,7 +784,7 @@ void VisionManager::FocusTrack()
     cv::Rect track_res;
     bool is_success = focus_ptr_->Track(stamped_img.img, track_res);
     if (focus_ptr_->GetLostStatus()) {
-      RCLCPP_WARN(get_logger(), "Auto track object lost. ");
+      WARN("Auto track object lost. ");
       processing_status_.status = TrackingStatusT::STATUS_SELECTING;
     }
 
@@ -808,14 +809,14 @@ void VisionManager::FocusTrack()
       algo_proc_.process_num--;
       //  Convert data to publish
       if (is_success) {
-        RCLCPP_INFO(
-          get_logger(), "Focus result %d,%d,%d,%d.", track_res.x, track_res.y, track_res.width,
+        INFO(
+          "Focus result %d,%d,%d,%d.", track_res.x, track_res.y, track_res.width,
           track_res.height);
         Convert(stamped_img.header, track_res, algo_result_.track_res);
       }
       std::cout << "===focus thread process_num: " << algo_proc_.process_num << std::endl;
       if (0 == algo_proc_.process_num) {
-        RCLCPP_INFO(get_logger(), "Focus thread notify to pub. ");
+        INFO("Focus thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -886,7 +887,7 @@ void VisionManager::ReIDProc()
     // ReID and get result
     cv::Mat img_show;
     {
-      RCLCPP_INFO(get_logger(), "Waiting for mutex to reid. ");
+      INFO("Waiting for mutex to reid. ");
       std::unique_lock<std::mutex> lk_body(body_results_.mtx);
       std::vector<InferBbox> body_bboxes = BodyConvert(body_results_.body_infos.back());
       img_show = body_results_.detection_img.img.clone();
@@ -895,8 +896,9 @@ void VisionManager::ReIDProc()
           body_results_.detection_img.img, body_bboxes, person_id, tracked_bbox) &&
         -1 != person_id)
       {
-        RCLCPP_INFO(
-          get_logger(), "Reid result, person id: %d, bbox: %d, %d, %d, %d", person_id, tracked_bbox.x, tracked_bbox.y, tracked_bbox.width,
+        INFO(
+          "Reid result, person id: %d, bbox: %d, %d, %d, %d", person_id, tracked_bbox.x,
+          tracked_bbox.y, tracked_bbox.width,
           tracked_bbox.height);
       }
       if (reid_ptr_->GetLostStatus()) {
@@ -920,7 +922,7 @@ void VisionManager::ReIDProc()
       // cv::waitKey(10);
       std::cout << "===reid thread process_num: " << algo_proc_.process_num << std::endl;
       if (0 == algo_proc_.process_num) {
-        RCLCPP_INFO(get_logger(), "Reid thread notify to pub. ");
+        INFO("Reid thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -987,7 +989,7 @@ void VisionManager::GestureRecognize()
         Convert(infos, algo_result_.body_info);
       }
       if (0 == algo_proc_.process_num) {
-        RCLCPP_INFO(get_logger(), "Gesture thread notify to pub. ");
+        INFO("Gesture thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -1069,7 +1071,7 @@ void VisionManager::KeypointsDet()
       // Convert data to publish
       Convert(bodies_keypoints, algo_result_.body_info);
       if (0 == algo_proc_.process_num) {
-        RCLCPP_INFO(get_logger(), "Keypoints thread notify to pub. ");
+        INFO("Keypoints thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
@@ -1080,7 +1082,7 @@ int VisionManager::LoadFaceLibrary(std::map<std::string, std::vector<float>> & l
 {
   cv::FileStorage fs(std::string(kLibraryPath), cv::FileStorage::READ);
   if (!fs.isOpened()) {
-    RCLCPP_ERROR(get_logger(), "Open the face library file fail! ");
+    ERROR("Open the face library file fail! ");
     return -1;
   }
 
@@ -1127,11 +1129,11 @@ int VisionManager::GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi)
   if (is_found) {
     std::vector<float> reid_feat;
     if (0 != reid_ptr_->SetTracker(track_img, track_rect, reid_feat)) {
-      RCLCPP_WARN(get_logger(), "Set reid tracker fail. ");
+      WARN("Set reid tracker fail. ");
       return -1;
     }
   } else {
-    RCLCPP_WARN(get_logger(), "Can not find match body. ");
+    WARN("Can not find match body. ");
     return -1;
   }
   return 0;
@@ -1172,8 +1174,8 @@ void VisionManager::TrackingService(
   const std::shared_ptr<BodyRegionT::Request> req,
   std::shared_ptr<BodyRegionT::Response> res)
 {
-  RCLCPP_INFO(
-    get_logger(), "Received tracking object from app: %d, %d, %d, %d",
+  INFO(
+    "Received tracking object from app: %d, %d, %d, %d",
     req->roi.x_offset, req->roi.y_offset, req->roi.width, req->roi.height);
 
   if (open_reid_) {
@@ -1195,7 +1197,7 @@ void VisionManager::TrackingService(
     }
     cv::Rect rect = Convert(req->roi);
     if (!focus_ptr_->SetTracker(stamped_img.img, rect)) {
-      RCLCPP_WARN(get_logger(), "Set focus tracker fail. ");
+      WARN("Set focus tracker fail. ");
       res->success = false;
     } else {
       res->success = true;
@@ -1209,7 +1211,7 @@ void VisionManager::AlgoManagerService(
   const std::shared_ptr<AlgoManagerT::Request> req,
   std::shared_ptr<AlgoManagerT::Response> res)
 {
-  RCLCPP_INFO(get_logger(), "Received algo request. ");
+  INFO("Received algo request. ");
   for (size_t i = 0; i < req->algo_enable.size(); ++i) {
     SetAlgoState(req->algo_enable[i], true);
   }
@@ -1226,8 +1228,8 @@ void VisionManager::FaceManagerService(
   const std::shared_ptr<FaceManagerT::Request> request,
   std::shared_ptr<FaceManagerT::Response> response)
 {
-  RCLCPP_INFO(
-    get_logger(), "face service received command %d, argument '%s'",
+  INFO(
+    "face service received command %d, argument '%s'",
     request->command, request->args.c_str());
 
   switch (request->command) {
@@ -1284,7 +1286,7 @@ void VisionManager::FaceManagerService(
       response->result = 0;
       break;
     default:
-      RCLCPP_ERROR(get_logger(), "service unsupport command %d", request->command);
+      ERROR("service unsupport command %d", request->command);
       response->result = FaceManagerT::Response::RESULT_INVALID_ARGS;
   }
 }
@@ -1368,8 +1370,8 @@ void VisionManager::FaceDetProc(std::string face_name)
         checkFacePose_ret = 17;
         face_name = match_info[0].face_id;
         checkFacePose_Msg = "face already in endlib";
-        RCLCPP_ERROR(
-          get_logger(), "%s face already in endlib current score:%f",
+        ERROR(
+          "%s face already in endlib current score:%f",
           face_name.c_str(), match_info[0].match_score);
       } else {
         FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
@@ -1400,10 +1402,10 @@ bool VisionManager::CallService(
   std::chrono::seconds timeout = std::chrono::seconds(10);
   if (!client->wait_for_service(timeout)) {
     if (!rclcpp::ok()) {
-      RCLCPP_ERROR(get_logger(), "Interrupted while waiting for the service. Exiting.");
+      ERROR("Interrupted while waiting for the service. Exiting.");
       return false;
     }
-    RCLCPP_INFO(get_logger(), "Service not available...");
+    INFO("Service not available...");
     return false;
   }
 

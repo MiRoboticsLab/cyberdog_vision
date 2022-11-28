@@ -17,13 +17,14 @@
 #include <memory>
 
 #include "cyberdog_vision/keypoints_detection.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog_vision
 {
 
 KeypointsDetection::KeypointsDetection(const std::string & model_path)
 {
-  std::cout << "===Init KeypointsDetection===" << std::endl;
+  INFO("===Init KeypointsDetection===");
   std::string model_keypoints = model_path + "/human_keyoint_256x192x17.plan";
   keypoints_ptr_ = std::make_shared<Person_keyPoints>(model_keypoints);
 }

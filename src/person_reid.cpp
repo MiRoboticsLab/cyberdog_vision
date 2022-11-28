@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "cyberdog_vision/person_reid.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 const int kFeatLen = 128;
 namespace cyberdog_vision
@@ -25,7 +26,7 @@ PersonReID::PersonReID(const std::string & model_path)
 : gpu_id_(0), tracking_id_(0), object_loss_th_(300), library_frame_num_(15), unmatch_count_(0),
   feat_sim_th_(0.8), feat_update_th_(0.9), is_tracking_(false), is_lost_(true), reid_ptr_(nullptr)
 {
-  std::cout << "===Init PersonReID===" << std::endl;
+  INFO("===Init PersonReID===");
   std::string model_reid = model_path + "/reid_v4_mid.engine";
   if (0 != REID_Init(reid_ptr_, model_reid.c_str(), gpu_id_)) {
     throw std::logic_error("Init person reid algo fial. ");
@@ -37,7 +38,7 @@ int PersonReID::SetTracker(
   std::vector<float> & reid_feat)
 {
   if (0 != GetFeature(img, body_box, reid_feat)) {
-    std::cout << "GetFeature fail. " << std::endl;
+    WARN("GetFeature fail. ");
     return -1;
   }
   tracker_feat_.assign(reid_feat.begin(), reid_feat.end());
@@ -55,14 +56,14 @@ int PersonReID::GetReIDInfo(
   int & id, cv::Rect & tracked)
 {
   if (tracker_feat_.empty()) {
-    std::cout << "Please set tracker before tracking. " << std::endl;
+    WARN("Please set tracker before tracking. ");
     return -1;
   }
 
   id = -1;
   tracked = cv::Rect(0, 0, 0, 0);
   size_t index = 0;
-  double max_sim = 0;
+  float max_sim = 0;
   std::vector<float> match_feat;
   for (size_t i = 0; i < body_bboxes.size(); ++i) {
     // For every body bbox
@@ -71,8 +72,8 @@ int PersonReID::GetReIDInfo(
       return -1;
     }
 
-    double sim_val = GetSim(feat, tracker_feat_, SimType::kSimOne2Group);
-    std::cout << "Object " << i << " sim: " << sim_val << std::endl;
+    float sim_val = GetSim(feat, tracker_feat_, SimType::kSimOne2Group);
+    INFO("Object %d, sim: %f", i, sim_val);
     if (sim_val > max_sim) {
       index = i;
       max_sim = sim_val;
@@ -82,11 +83,12 @@ int PersonReID::GetReIDInfo(
 
   if (max_sim > feat_sim_th_) {
     // Match success
-    std::cout << "Match success, sim: " << max_sim << ", bbox: " << body_bboxes[index].body_box <<
-      std::endl;
     unmatch_count_ = 0;
     id = tracking_id_;
     tracked = body_bboxes[index].body_box;
+    INFO(
+      "Match success, sim: %f, bbox: %d,%d,%d,%d", max_sim, tracked.x, tracked.y, tracked.width,
+      tracked.height);
     if (max_sim > feat_update_th_) {
       // Update library feat
       if (static_cast<int>(tracker_feat_.size()) / kFeatLen == library_frame_num_) {
@@ -95,10 +97,10 @@ int PersonReID::GetReIDInfo(
       tracker_feat_.insert(tracker_feat_.end(), match_feat.begin(), match_feat.end());
     }
   } else {
-    std::cout << "Match fail, current count: " << unmatch_count_ << std::endl;
+    WARN("Match fail, current count: %d", unmatch_count_);
     unmatch_count_++;
     if (unmatch_count_ > object_loss_th_) {
-      std::cout << "Object is lost. " << std::endl;
+      WARN("Object is lost. ");
       is_lost_ = true;
       ResetTracker();
     }
@@ -136,7 +138,7 @@ int PersonReID::GetFeature(
   xm_reid_img.fmt = XM_IMG_FMT_BGR;
   float * feat = nullptr;
   if (0 != REID_ExtractFeat(reid_ptr_, &xm_reid_img, feat)) {
-    std::cout << "Extract reid feature fail." << std::endl;
+    WARN("Extract reid feature fail.");
     return -1;
   }
   reid_feat.resize(GetFeatureLen());
