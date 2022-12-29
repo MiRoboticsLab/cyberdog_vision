@@ -98,12 +98,12 @@ struct AlgoStruct
 
 struct AlgoProcess
 {
-  int process_num;
+  bool process_complated;
   std::mutex mtx;
   std::condition_variable cond;
   AlgoProcess()
   {
-    process_num = 0;
+    process_complated = false;
   }
 };
 
