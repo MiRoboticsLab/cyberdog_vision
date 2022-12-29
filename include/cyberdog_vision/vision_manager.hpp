@@ -99,6 +99,7 @@ private:
   void GestureRecognize();
   void KeypointsDet();
   void FaceDetProc(std::string);
+  void SetThreadState(const std::string & thread_flag, bool & state);
 
   int LoadFaceLibrary(std::map<std::string, std::vector<float>> & library);
   int GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi);
@@ -194,6 +195,13 @@ private:
   bool reid_deactivated_;
   bool gesture_deactivated_;
   bool keypoints_deactivated_;
+
+  bool face_complated_;
+  bool body_complated_;
+  bool gesture_complated_;
+  bool keypoints_complated_;
+  bool reid_complated_;
+  bool focus_complated_;
 };
 
 }  // namespace cyberdog_vision
