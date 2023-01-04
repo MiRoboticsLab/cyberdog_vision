@@ -482,7 +482,6 @@ void VisionManager::MainAlgoManager()
       INFO("MainAlgoManager: Main thread wake up to pub. ");
       {
         std::unique_lock<std::mutex> lk_result(result_mtx_);
-        algo_result_.header.stamp = algo_result_.body_info.header.stamp;
         person_pub_->publish(algo_result_);
         // TODO(lff)： remove log
         INFO(
@@ -654,6 +653,7 @@ void VisionManager::BodyDet()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       body_complated_ = true;
+      algo_result_.header = stamped_img.header;
       Convert(stamped_img.header, infos, algo_result_.body_info);
       INFO(
         "BodyDet: Det result-img: %d.%d", stamped_img.header.stamp.sec,
@@ -731,6 +731,7 @@ void VisionManager::FaceRecognize()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       face_complated_ = true;
+      algo_result_.header = stamped_img.header;
       Convert(stamped_img.header, result, algo_result_.face_info);
       SetThreadState("FaceRecognize", algo_proc_.process_complated);
       INFO("FaceRecognize: face thread process_complated: %d", algo_proc_.process_complated);
@@ -773,25 +774,25 @@ void VisionManager::FocusTrack()
     }
 
     // Focus track and get result
-    cv::Rect track_res;
-    bool is_success = focus_ptr_->Track(stamped_img.img, track_res);
+    cv::Rect track_res = cv::Rect(0, 0, 0, 0);
+    if (!focus_ptr_->Track(stamped_img.img, track_res)) {
+      WARN("FocusTrack: Auto track fail of crunt frame. ");
+    }
     if (focus_ptr_->GetLostStatus()) {
       WARN("FocusTrack: Auto track object lost. ");
       processing_status_.status = TrackingStatusT::STATUS_SELECTING;
     }
 
     // TODO(lff) remove: Debug - visualization
-    // if (is_success) {
-    //   cv::Mat img_show = stamped_img.img.clone();
-    //   cv::rectangle(img_show, track_res, cv::Scalar(0, 0, 255));
-    //   char path[200];
-    //   sprintf(
-    //     path, "/SDCARD/result/%d.%d.jpg", stamped_img.header.stamp.sec,
-    //     stamped_img.header.stamp.nanosec);
-    //   cv::imwrite(path, img_show);
-    //   cv::imshow("Track", img_show);
-    //   cv::waitKey(10);
-    // }
+    // cv::Mat img_show = stamped_img.img.clone();
+    // cv::rectangle(img_show, track_res, cv::Scalar(0, 0, 255));
+    // char path[200];
+    // sprintf(
+    //   path, "/SDCARD/result/%d.%d.jpg", stamped_img.header.stamp.sec,
+    //   stamped_img.header.stamp.nanosec);
+    // cv::imwrite(path, img_show);
+    // cv::imshow("Track", img_show);
+    // cv::waitKey(10);
 
     // Storage foucs track result
     {
@@ -800,12 +801,11 @@ void VisionManager::FocusTrack()
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       focus_complated_ = true;
       //  Convert data to publish
-      if (is_success) {
-        INFO(
-          "FocusTrack: Focus result %d,%d,%d,%d.", track_res.x, track_res.y, track_res.width,
-          track_res.height);
-        Convert(stamped_img.header, track_res, algo_result_.track_res);
-      }
+      INFO(
+        "FocusTrack: Focus result %d,%d,%d,%d.", track_res.x, track_res.y, track_res.width,
+        track_res.height);
+      algo_result_.header = stamped_img.header;
+      Convert(stamped_img.header, track_res, algo_result_.track_res);
       SetThreadState("FocusTrack", algo_proc_.process_complated);
       INFO("FocusTrack: focus thread process_complated: %d", algo_proc_.process_complated);
       if (algo_proc_.process_complated) {
