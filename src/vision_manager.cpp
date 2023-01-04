@@ -99,7 +99,7 @@ void ResetCudaDevs()
   int dev_count = 0;
   cudaSetDevice(dev_count);
   cudaDeviceReset();
-  INFO("Cuda device reset complated.");
+  INFO("Cuda device reset complated. ");
 }
 
 ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
@@ -475,7 +475,7 @@ void VisionManager::MainAlgoManager()
     }
 
     // Wait for result to pub
-    {
+    if (open_body_ || open_face_ || open_focus_) {
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
       INFO("MainAlgoManager: main thread process_complated: %d", algo_proc_.process_complated);
       algo_proc_.cond.wait(lk_proc, [this] {return algo_proc_.process_complated;});
@@ -623,7 +623,7 @@ void VisionManager::BodyDet()
         body_results_.detection_img.header = stamped_img.header;
         body_results_.is_filled = true;
         body_results_.cond.notify_one();
-        INFO("BodyDet: Body thread notify depend thread.");
+        INFO("BodyDet: Body thread notify depend thread. ");
 
         INFO("BodyDet: Body detection num: %d", infos.size());
         for (size_t count = 0; count < infos.size(); ++count) {
@@ -664,7 +664,7 @@ void VisionManager::BodyDet()
       SetThreadState("BodyDet", algo_proc_.process_complated);
       INFO("BodyDet: body thread process_complated: %d", algo_proc_.process_complated);
       if (algo_proc_.process_complated) {
-        INFO("BodyDet: Body thread notify to pub . ");
+        INFO("BodyDet: Body thread notify to pub. ");
         algo_proc_.cond.notify_one();
       }
     }
