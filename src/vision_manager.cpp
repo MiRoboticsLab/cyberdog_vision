@@ -45,6 +45,12 @@ VisionManager::VisionManager()
   reid_complated_(false), focus_complated_(false)
 {
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+  // Create subscriber to update model
+  auto download_callback = [this](const ConnectorStatusT::SharedPtr msg) {
+      DownloadCallback(msg);
+    };
+  connector_sub_ = create_subscription<ConnectorStatusT>(
+    "connector_state", rclcpp::SystemDefaultsQoS(), download_callback);
 }
 
 ReturnResultT VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
@@ -234,7 +240,6 @@ void VisionManager::CreateObject()
   pub_qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
   person_pub_ = create_publisher<PersonInfoT>("person", pub_qos);
   status_pub_ = create_publisher<TrackingStatusT>("processing_status", pub_qos);
-
   face_result_pub_ = create_publisher<FaceResultT>("facemanager/face_result", pub_qos);
 }
 
@@ -1413,6 +1418,39 @@ bool VisionManager::CallService(
 
   auto result = client->async_send_request(req, client_cb);
   return true;
+}
+
+void Download(const std::string & name)
+{
+  cyberdog::common::cyberdog_model test(name);
+  test.SetTimeout(300);
+  int32_t code = test.UpdateModels();
+  if (0 == code) {
+    INFO("Update model from Fds success. ");
+  } else {
+    ERROR("Update model %s from Fds fail.", name.c_str());
+  }
+}
+
+void VisionManager::DownloadCallback(const ConnectorStatusT::SharedPtr msg)
+{
+  INFO("Received single to download model. ");
+  if (msg->is_internet) {
+    INFO("Internet is ready, begin to download model.");
+    Download("auto_track");
+    Download("body_gesture");
+    Download("face_recognition/age");
+    Download("face_recognition/detect");
+    Download("face_recognition/emotion");
+    Download("face_recognition/feature");
+    Download("face_recognition/landmark");
+    Download("keypoints_detection");
+    Download("person_reid");
+  } else {
+    ERROR("Internet is not ready will not download. ");
+  }
+
+  connector_sub_ = nullptr;
 }
 
 VisionManager::~VisionManager()
