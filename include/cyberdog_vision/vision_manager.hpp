@@ -36,6 +36,8 @@
 #include "protocol/srv/camera_service.hpp"
 #include "protocol/srv/algo_manager.hpp"
 #include "protocol/srv/face_manager.hpp"
+#include "protocol/msg/connector_status.hpp"
+#include "cyberdog_common/cyberdog_model.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "rclcpp_lifecycle/lifecycle_publisher.hpp"
 
@@ -65,6 +67,7 @@ using AlgoManagerT = protocol::srv::AlgoManager;
 using FaceManagerT = protocol::srv::FaceManager;
 using FaceResultT = protocol::msg::FaceResult;
 using TrackingStatusT = protocol::msg::TrackingStatus;
+using ConnectorStatusT = protocol::msg::ConnectorStatus;
 using ReturnResultT = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
 class VisionManager : public rclcpp_lifecycle::LifecycleNode
@@ -128,11 +131,15 @@ private:
     rclcpp::Client<CameraServiceT>::SharedPtr & client, const uint8_t & cmd,
     const std::string & args);
 
+  void DownloadCallback(const ConnectorStatusT::SharedPtr msg);
+
 private:
   rclcpp::Service<BodyRegionT>::SharedPtr tracking_service_;
   rclcpp::Service<AlgoManagerT>::SharedPtr algo_manager_service_;
   rclcpp::Service<FaceManagerT>::SharedPtr facemanager_service_;
   rclcpp::Client<CameraServiceT>::SharedPtr camera_clinet_;
+
+  rclcpp::Subscription<ConnectorStatusT>::SharedPtr connector_sub_;
 
   rclcpp_lifecycle::LifecyclePublisher<PersonInfoT>::SharedPtr person_pub_;
   rclcpp_lifecycle::LifecyclePublisher<TrackingStatusT>::SharedPtr status_pub_;
@@ -167,6 +174,7 @@ private:
   AlgoStruct reid_struct_;
   AlgoStruct focus_struct_;
   AlgoProcess algo_proc_;
+  AlgoStruct download_struct_;
 
   std::mutex result_mtx_;
   PersonInfoT algo_result_;
