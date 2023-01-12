@@ -66,15 +66,6 @@ add_executable(vision_manager
   src/face_manager.cpp
 )
 
-add_executable(test_ai
-  src/test_ai.cpp
-  src/body_detection.cpp
-  src/face_recognition.cpp
-  src/gesture_recognition.cpp
-  src/keypoints_detection.cpp
-  src/person_reid.cpp
-)
-
 ament_target_dependencies(vision_manager
   XMBODY
   XMFACE
@@ -89,36 +80,9 @@ ament_target_dependencies(vision_manager
   OpenCV
   CUDA
 )
-ament_target_dependencies(test_ai
-  XMBODY
-  XMFACE
-  XMGESTURE
-  XMKEYPOINTS
-  XMREID
-  XMTRACK
-  rclcpp
-  rclcpp_lifecycle
-  cyberdog_common
-  protocol
-  OpenCV
-  CUDA
-)
-
-add_executable(client
-  src/client.cpp
-)
-ament_target_dependencies(client rclcpp protocol)
-
-add_executable(produce
-  src/img_produce.cpp
-)
-ament_target_dependencies(produce OpenCV)
 
 install(TARGETS
   vision_manager
-  test_ai
-  client
-  produce
   DESTINATION lib/${PROJECT_NAME}
 )
 
