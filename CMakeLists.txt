@@ -66,15 +66,6 @@ add_executable(vision_manager
   src/face_manager.cpp
 )
 
-add_executable(test_ai
-  src/test_ai.cpp
-  src/body_detection.cpp
-  src/face_recognition.cpp
-  src/gesture_recognition.cpp
-  src/keypoints_detection.cpp
-  src/person_reid.cpp
-)
-
 ament_target_dependencies(vision_manager
   XMBODY
   XMFACE

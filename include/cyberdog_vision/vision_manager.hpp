@@ -88,10 +88,6 @@ private:
   int InitIPC();
   void CreateObject();
   void CreateThread();
-  void DestoryThread();
-  void WakeThread(AlgoStruct & algo);
-  void ResetThread(AlgoStruct & algo);
-  void ResetAlgo();
   void ImageProc();
   void MainAlgoManager();
   void DependAlgoManager();
@@ -101,16 +97,10 @@ private:
   void ReIDProc();
   void GestureRecognize();
   void KeypointsDet();
-  void FaceDetProc(std::string);
-  void SetThreadState(const std::string & thread_flag, bool & state);
 
   int LoadFaceLibrary(std::map<std::string, std::vector<float>> & library);
   int GetMatchBody(const sensor_msgs::msg::RegionOfInterest & roi);
   void SetAlgoState(const AlgoListT & algo_list, const bool & value);
-
-  void publishFaceResult(
-    int result, const std::string & name, cv::Mat & img,
-    std::string & face_msg);
 
   void TrackingService(
     const std::shared_ptr<rmw_request_id_t>,
@@ -122,16 +112,26 @@ private:
     const std::shared_ptr<AlgoManagerT::Request> req,
     std::shared_ptr<AlgoManagerT::Response> res);
 
+  bool CallService(
+    rclcpp::Client<CameraServiceT>::SharedPtr & client, const uint8_t & cmd,
+    const std::string & args);
+
   void FaceManagerService(
     const std::shared_ptr<rmw_request_id_t>,
     const std::shared_ptr<FaceManagerT::Request> req,
     std::shared_ptr<FaceManagerT::Response> res);
 
-  bool CallService(
-    rclcpp::Client<CameraServiceT>::SharedPtr & client, const uint8_t & cmd,
-    const std::string & args);
+  void publishFaceResult(
+    int result, const std::string & name, cv::Mat & img,
+    std::string & face_msg);
 
+  void FaceDetProc(std::string);
   void DownloadCallback(const ConnectorStatusT::SharedPtr msg);
+  void SetThreadState(const std::string & thread_flag, bool & state);
+  void WakeThread(AlgoStruct & algo);
+  void ResetThread(AlgoStruct & algo);
+  void ResetAlgo();
+  void DestoryThread();
 
 private:
   rclcpp::Service<BodyRegionT>::SharedPtr tracking_service_;

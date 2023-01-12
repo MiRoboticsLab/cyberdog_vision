@@ -256,152 +256,6 @@ void VisionManager::CreateThread()
   keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
 }
 
-void VisionManager::DestoryThread()
-{
-  if (img_proc_thread_->joinable()) {
-    img_proc_thread_->join();
-    INFO("img_proc_thread_ joined. ");
-  }
-
-  if (gesture_thread_->joinable()) {
-    if (!gesture_deactivated_) {
-      WakeThread(gesture_struct_);
-    }
-    gesture_thread_->join();
-    INFO("gesture_thread_ joined. ");
-  }
-
-  if (reid_thread_->joinable()) {
-    if (!reid_deactivated_) {
-      WakeThread(reid_struct_);
-    }
-    reid_thread_->join();
-    INFO("reid_thread_ joined. ");
-  }
-
-  if (keypoints_thread_->joinable()) {
-    if (!keypoints_deactivated_) {
-      WakeThread(keypoints_struct_);
-    }
-    keypoints_thread_->join();
-    INFO("keypoints_thread_ joined. ");
-  }
-
-  if (face_thread_->joinable()) {
-    if (!face_deactivated_) {
-      WakeThread(face_struct_);
-    }
-    face_thread_->join();
-    INFO("face_thread_ joined. ");
-  }
-
-  if (focus_thread_->joinable()) {
-    if (!focus_deactivated_) {
-      WakeThread(focus_struct_);
-    }
-    focus_thread_->join();
-    INFO("focus_thread_ joined. ");
-  }
-
-  if (body_det_thread_->joinable()) {
-    if (!body_deactivated_) {
-      WakeThread(body_struct_);
-    }
-    body_det_thread_->join();
-    INFO("body_det_thread_ joined. ");
-  }
-
-  {
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
-    algo_proc_.process_complated = true;
-    algo_proc_.cond.notify_one();
-    INFO("Destory notify to pub. ");
-  }
-  if (depend_manager_thread_->joinable()) {
-    if (!depend_deactivated_) {
-      std::unique_lock<std::mutex> lk_body(body_results_.mtx);
-      if (!body_results_.is_filled) {
-        body_results_.is_filled = true;
-        body_results_.cond.notify_one();
-        INFO("Destory notify depend thread. ");
-      }
-    }
-    depend_manager_thread_->join();
-    INFO("depend_manager_thread_ joined. ");
-  }
-
-  if (main_manager_thread_->joinable()) {
-    if (!main_algo_deactivated_) {
-      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
-      if (!global_img_buf_.is_filled) {
-        global_img_buf_.is_filled = true;
-        global_img_buf_.cond.notify_one();
-      }
-    }
-    main_manager_thread_->join();
-    INFO("main_manager_thread_ joined. ");
-  }
-}
-
-void VisionManager::WakeThread(AlgoStruct & algo)
-{
-  std::unique_lock<std::mutex> lk(algo.mtx);
-  if (!algo.is_called) {
-    algo.is_called = true;
-    algo.cond.notify_one();
-  }
-}
-
-void VisionManager::ResetThread(AlgoStruct & algo)
-{
-  std::unique_lock<std::mutex> lk(algo.mtx);
-  algo.is_called = false;
-}
-
-void VisionManager::ResetAlgo()
-{
-  focus_ptr_->ResetTracker();
-  reid_ptr_->ResetTracker();
-  open_face_ = false;
-  open_body_ = false;
-  open_gesture_ = false;
-  open_keypoints_ = false;
-  open_reid_ = false;
-  open_focus_ = false;
-  main_algo_deactivated_ = false;
-  depend_deactivated_ = false;
-  body_deactivated_ = false;
-  face_deactivated_ = false;
-  focus_deactivated_ = false;
-  reid_deactivated_ = false;
-  gesture_deactivated_ = false;
-  keypoints_deactivated_ = false;
-  face_complated_ = false;
-  body_complated_ = false;
-  gesture_complated_ = false;
-  keypoints_complated_ = false;
-  reid_complated_ = false;
-  focus_complated_ = false;
-  ResetThread(body_struct_);
-  ResetThread(face_struct_);
-  ResetThread(focus_struct_);
-  ResetThread(reid_struct_);
-  ResetThread(gesture_struct_);
-  ResetThread(keypoints_struct_);
-  {
-    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
-    body_results_.is_filled = false;
-  }
-  {
-    std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
-    global_img_buf_.is_filled = false;
-  }
-  {
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
-    algo_proc_.process_complated = false;
-  }
-}
-
 void VisionManager::ImageProc()
 {
   while (rclcpp::ok()) {
@@ -1130,6 +984,42 @@ void VisionManager::AlgoManagerService(
   res->result_disable = AlgoManagerT::Response::DISABLE_SUCCESS;
 }
 
+bool VisionManager::CallService(
+  rclcpp::Client<CameraServiceT>::SharedPtr & client,
+  const uint8_t & cmd, const std::string & args)
+{
+  auto req = std::make_shared<CameraServiceT::Request>();
+  req->command = cmd;
+  req->args = args;
+
+  std::chrono::seconds timeout = std::chrono::seconds(10);
+  if (!client->wait_for_service(timeout)) {
+    if (!rclcpp::ok()) {
+      ERROR("Interrupted while waiting for the service. Exiting.");
+      return false;
+    }
+    INFO("Service not available...");
+    return false;
+  }
+
+  auto client_cb = [timeout](rclcpp::Client<CameraServiceT>::SharedFuture future) {
+      std::future_status status = future.wait_for(timeout);
+
+      if (status == std::future_status::ready) {
+        if (0 != future.get()->result) {
+          return false;
+        } else {
+          return true;
+        }
+      } else {
+        return false;
+      }
+    };
+
+  auto result = client->async_send_request(req, client_cb);
+  return true;
+}
+
 void VisionManager::FaceManagerService(
   const std::shared_ptr<rmw_request_id_t>,
   const std::shared_ptr<FaceManagerT::Request> request,
@@ -1298,55 +1188,6 @@ void VisionManager::FaceDetProc(std::string face_name)
   }
 }
 
-void VisionManager::SetThreadState(const std::string & thread_flag, bool & state)
-{
-  INFO("%s: Face: %d", thread_flag.c_str(), !open_face_ || face_complated_);
-  INFO("%s: Body: %d", thread_flag.c_str(), !open_body_ || body_complated_);
-  INFO("%s: Focus: %d", thread_flag.c_str(), !open_focus_ || focus_complated_);
-  INFO("%s: Keypoints: %d", thread_flag.c_str(), !open_keypoints_ || keypoints_complated_);
-  INFO("%s: Gesture: %d", thread_flag.c_str(), !open_gesture_ || gesture_complated_);
-  INFO("%s: ReID: %d", thread_flag.c_str(), !open_reid_ || reid_complated_);
-  state = (!open_face_ || face_complated_) && (!open_body_ || body_complated_) &&
-    (!open_gesture_ || gesture_complated_) && (!open_keypoints_ || keypoints_complated_) &&
-    (!open_reid_ || reid_complated_) && (!open_focus_ || focus_complated_);
-}
-
-bool VisionManager::CallService(
-  rclcpp::Client<CameraServiceT>::SharedPtr & client,
-  const uint8_t & cmd, const std::string & args)
-{
-  auto req = std::make_shared<CameraServiceT::Request>();
-  req->command = cmd;
-  req->args = args;
-
-  std::chrono::seconds timeout = std::chrono::seconds(10);
-  if (!client->wait_for_service(timeout)) {
-    if (!rclcpp::ok()) {
-      ERROR("Interrupted while waiting for the service. Exiting.");
-      return false;
-    }
-    INFO("Service not available...");
-    return false;
-  }
-
-  auto client_cb = [timeout](rclcpp::Client<CameraServiceT>::SharedFuture future) {
-      std::future_status status = future.wait_for(timeout);
-
-      if (status == std::future_status::ready) {
-        if (0 != future.get()->result) {
-          return false;
-        } else {
-          return true;
-        }
-      } else {
-        return false;
-      }
-    };
-
-  auto result = client->async_send_request(req, client_cb);
-  return true;
-}
-
 void Download(const std::string & name)
 {
   cyberdog::common::cyberdog_model test(name);
@@ -1376,6 +1217,165 @@ void VisionManager::DownloadCallback(const ConnectorStatusT::SharedPtr msg)
     connector_sub_ = nullptr;
   } else {
     ERROR("Internet is not ready will not download. ");
+  }
+}
+
+void VisionManager::SetThreadState(const std::string & thread_flag, bool & state)
+{
+  INFO("%s: Face: %d", thread_flag.c_str(), !open_face_ || face_complated_);
+  INFO("%s: Body: %d", thread_flag.c_str(), !open_body_ || body_complated_);
+  INFO("%s: Focus: %d", thread_flag.c_str(), !open_focus_ || focus_complated_);
+  INFO("%s: Keypoints: %d", thread_flag.c_str(), !open_keypoints_ || keypoints_complated_);
+  INFO("%s: Gesture: %d", thread_flag.c_str(), !open_gesture_ || gesture_complated_);
+  INFO("%s: ReID: %d", thread_flag.c_str(), !open_reid_ || reid_complated_);
+  state = (!open_face_ || face_complated_) && (!open_body_ || body_complated_) &&
+    (!open_gesture_ || gesture_complated_) && (!open_keypoints_ || keypoints_complated_) &&
+    (!open_reid_ || reid_complated_) && (!open_focus_ || focus_complated_);
+}
+
+void VisionManager::WakeThread(AlgoStruct & algo)
+{
+  std::unique_lock<std::mutex> lk(algo.mtx);
+  if (!algo.is_called) {
+    algo.is_called = true;
+    algo.cond.notify_one();
+  }
+}
+
+void VisionManager::ResetThread(AlgoStruct & algo)
+{
+  std::unique_lock<std::mutex> lk(algo.mtx);
+  algo.is_called = false;
+}
+
+void VisionManager::ResetAlgo()
+{
+  focus_ptr_->ResetTracker();
+  reid_ptr_->ResetTracker();
+  open_face_ = false;
+  open_body_ = false;
+  open_gesture_ = false;
+  open_keypoints_ = false;
+  open_reid_ = false;
+  open_focus_ = false;
+  main_algo_deactivated_ = false;
+  depend_deactivated_ = false;
+  body_deactivated_ = false;
+  face_deactivated_ = false;
+  focus_deactivated_ = false;
+  reid_deactivated_ = false;
+  gesture_deactivated_ = false;
+  keypoints_deactivated_ = false;
+  face_complated_ = false;
+  body_complated_ = false;
+  gesture_complated_ = false;
+  keypoints_complated_ = false;
+  reid_complated_ = false;
+  focus_complated_ = false;
+  ResetThread(body_struct_);
+  ResetThread(face_struct_);
+  ResetThread(focus_struct_);
+  ResetThread(reid_struct_);
+  ResetThread(gesture_struct_);
+  ResetThread(keypoints_struct_);
+  {
+    std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+    body_results_.is_filled = false;
+  }
+  {
+    std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+    global_img_buf_.is_filled = false;
+  }
+  {
+    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
+    algo_proc_.process_complated = false;
+  }
+}
+
+void VisionManager::DestoryThread()
+{
+  if (img_proc_thread_->joinable()) {
+    img_proc_thread_->join();
+    INFO("img_proc_thread_ joined. ");
+  }
+
+  if (gesture_thread_->joinable()) {
+    if (!gesture_deactivated_) {
+      WakeThread(gesture_struct_);
+    }
+    gesture_thread_->join();
+    INFO("gesture_thread_ joined. ");
+  }
+
+  if (reid_thread_->joinable()) {
+    if (!reid_deactivated_) {
+      WakeThread(reid_struct_);
+    }
+    reid_thread_->join();
+    INFO("reid_thread_ joined. ");
+  }
+
+  if (keypoints_thread_->joinable()) {
+    if (!keypoints_deactivated_) {
+      WakeThread(keypoints_struct_);
+    }
+    keypoints_thread_->join();
+    INFO("keypoints_thread_ joined. ");
+  }
+
+  if (face_thread_->joinable()) {
+    if (!face_deactivated_) {
+      WakeThread(face_struct_);
+    }
+    face_thread_->join();
+    INFO("face_thread_ joined. ");
+  }
+
+  if (focus_thread_->joinable()) {
+    if (!focus_deactivated_) {
+      WakeThread(focus_struct_);
+    }
+    focus_thread_->join();
+    INFO("focus_thread_ joined. ");
+  }
+
+  if (body_det_thread_->joinable()) {
+    if (!body_deactivated_) {
+      WakeThread(body_struct_);
+    }
+    body_det_thread_->join();
+    INFO("body_det_thread_ joined. ");
+  }
+
+  {
+    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
+    algo_proc_.process_complated = true;
+    algo_proc_.cond.notify_one();
+    INFO("Destory notify to pub. ");
+  }
+  if (depend_manager_thread_->joinable()) {
+    if (!depend_deactivated_) {
+      std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+      if (!body_results_.is_filled) {
+        body_results_.is_filled = true;
+        body_results_.cond.notify_one();
+        INFO("Destory notify depend thread. ");
+      }
+    }
+    depend_manager_thread_->join();
+    INFO("depend_manager_thread_ joined. ");
+  }
+
+  if (main_manager_thread_->joinable()) {
+    if (!main_algo_deactivated_) {
+      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+      if (!global_img_buf_.is_filled) {
+        global_img_buf_.is_filled = true;
+        global_img_buf_.cond.notify_one();
+      }
+    }
+    main_manager_thread_->join();
+    INFO("main_manager_thread_ joined. ");
   }
 }
 
