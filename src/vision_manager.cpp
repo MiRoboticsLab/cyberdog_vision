@@ -133,7 +133,7 @@ ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*
   gesture_ptr_.reset();
   reid_ptr_.reset();
   keypoints_ptr_.reset();
-  // ResetCudaDevs();
+  ResetCudaDevs();
   INFO("Clean up complated. ");
   return ReturnResultT::SUCCESS;
 }
@@ -488,7 +488,6 @@ void VisionManager::MainAlgoManager()
       {
         std::unique_lock<std::mutex> lk_result(result_mtx_);
         person_pub_->publish(algo_result_);
-        // TODO(lff)： remove log
         INFO(
           "MainAlgoManager: Publish det stamp: %d.%d", algo_result_.body_info.header.stamp.sec,
           algo_result_.body_info.header.stamp.nanosec);
@@ -635,18 +634,6 @@ void VisionManager::BodyDet()
             "BodyDet: Person %d: sim: %f, x: %d", count, infos[count].score,
             infos[count].left);
         }
-
-        // TODO(lff) remove: Debug - visualization
-        // INFO("Detection result: " );
-        // INFO("Person num: %d", infos.size());
-        // cv::Mat img_show = stamped_img.img.clone();
-        // for (auto & res : infos) {
-        //   cv::rectangle(
-        //     img_show, cv::Rect(res.left, res.top, res.width, res.height),
-        //     cv::Scalar(0, 0, 255));
-        // }
-        // cv::imshow("vision", img_show);
-        // cv::waitKey(10);
       } else {
         WARN("BodyDet: Body detect fail of current image. ");
       }
@@ -788,17 +775,6 @@ void VisionManager::FocusTrack()
       processing_status_.status = TrackingStatusT::STATUS_SELECTING;
     }
 
-    // TODO(lff) remove: Debug - visualization
-    // cv::Mat img_show = stamped_img.img.clone();
-    // cv::rectangle(img_show, track_res, cv::Scalar(0, 0, 255));
-    // char path[200];
-    // sprintf(
-    //   path, "/SDCARD/result/%d.%d.jpg", stamped_img.header.stamp.sec,
-    //   stamped_img.header.stamp.nanosec);
-    // cv::imwrite(path, img_show);
-    // cv::imshow("Track", img_show);
-    // cv::waitKey(10);
-
     // Storage foucs track result
     {
       std::lock(algo_proc_.mtx, result_mtx_);
@@ -887,14 +863,7 @@ void VisionManager::ReIDProc()
       std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       std::unique_lock<std::mutex> lk_result(result_mtx_, std::adopt_lock);
       reid_complated_ = true;
-      // algo_result_.body_info.infos[person_index].reid = std::to_string(person_id);
       Convert(img_header, tracked_bbox, algo_result_.track_res);
-      // if (tracked.bbox.width != 0 && tracked.bbox.height != 0) {
-      //   cv::rectangle(img_show, tracked_bbox, cv::Scalar(0, 0, 255));
-      // }
-
-      // cv::imshow("reid", img_show);
-      // cv::waitKey(10);
       SetThreadState("ReIDProc", algo_proc_.process_complated);
       INFO("ReIDProc: reid thread process_complated: %d", algo_proc_.process_complated);
       if (algo_proc_.process_complated) {
@@ -940,20 +909,6 @@ void VisionManager::GestureRecognize()
       }
     }
 
-    // TODO(lff) remove: Debug - visual
-    // if (is_success) {
-    //   cv::Mat img_show = body_results_.detection_img.img.clone();
-    //   for (size_t i = 0; i < infos.size(); ++i) {
-    //     cv::rectangle(img_show, infos[i].rect, cv::Scalar(0, 0, 255));
-    //     cv::putText(
-    //       img_show, std::to_string(infos[i].label),
-    //       cv::Point(infos[i].rect.x, infos[i].rect.y), cv::FONT_HERSHEY_COMPLEX, 1.0,
-    //       cv::Scalar(0, 0, 255));
-    //     cv::imshow("gesture", img_show);
-    //     cv::waitKey(10);
-    //   }
-    // }
-
     // Storage gesture recognition result
     {
       std::lock(algo_proc_.mtx, result_mtx_);
@@ -987,25 +942,6 @@ void Convert(const std::vector<std::vector<cv::Point2f>> & from, BodyInfoT & to)
   }
 }
 
-void drawLines(cv::Mat & img, std::vector<cv::Point2f> & points, cv::Scalar color, int thickness)
-{
-  std::vector<std::vector<int>> skeleton =
-  {{15, 13}, {13, 11}, {16, 14}, {14, 12}, {11, 12}, {5, 11}, {6, 12}, {5, 6},
-    {5, 7}, {6, 8}, {7, 9}, {8, 10}, {0, 1}, {0, 2}, {1, 3}, {2, 4}};
-
-  for (auto & pair : skeleton) {
-    if (points[pair[0]].x > 0. && points[pair[0]].y > 0. &&
-      points[pair[1]].x > 0. && points[pair[1]].y > 0.)
-    {
-      cv::circle(
-        img, points[pair[0]], 3, CV_RGB(255, 0, 0), -1);
-      cv::circle(
-        img, points[pair[1]], 3, CV_RGB(255, 0, 0), -1);
-      cv::line(img, points[pair[0]], points[pair[1]], color, thickness);
-    }
-  }
-}
-
 void VisionManager::KeypointsDet()
 {
   while (rclcpp::ok()) {
@@ -1031,14 +967,6 @@ void VisionManager::KeypointsDet()
         body_results_.detection_img.img, body_bboxes,
         bodies_keypoints);
     }
-
-    // TODO(lff) remove: Debug - visual
-    // cv::Mat img_show = body_results_.detection_img.img.clone();
-    // for (size_t i = 0; i < bodies_keypoints.size(); ++i) {
-    //   drawLines(img_show, bodies_keypoints[i], cv::Scalar(255, 0, 0), 1);
-    // }
-    // cv::imshow("keypoints", img_show);
-    // cv::waitKey(10);
 
     // Storage keypoints detection result
     {
@@ -1168,7 +1096,6 @@ void VisionManager::TrackingService(
     }
   }
 
-  // TODO(lff): Wait for image and rect from app
   if (open_focus_) {
     StampedImage stamped_img;
     {
@@ -1446,11 +1373,10 @@ void VisionManager::DownloadCallback(const ConnectorStatusT::SharedPtr msg)
     Download("face_recognition/landmark");
     Download("keypoints_detection");
     Download("person_reid");
+    connector_sub_ = nullptr;
   } else {
     ERROR("Internet is not ready will not download. ");
   }
-
-  connector_sub_ = nullptr;
 }
 
 VisionManager::~VisionManager()

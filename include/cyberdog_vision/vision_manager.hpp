@@ -174,7 +174,6 @@ private:
   AlgoStruct reid_struct_;
   AlgoStruct focus_struct_;
   AlgoProcess algo_proc_;
-  AlgoStruct download_struct_;
 
   std::mutex result_mtx_;
   PersonInfoT algo_result_;
