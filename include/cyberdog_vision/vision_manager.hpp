@@ -67,7 +67,6 @@ using AlgoManagerT = protocol::srv::AlgoManager;
 using FaceManagerT = protocol::srv::FaceManager;
 using FaceResultT = protocol::msg::FaceResult;
 using TrackingStatusT = protocol::msg::TrackingStatus;
-using ConnectorStatusT = protocol::msg::ConnectorStatus;
 using ReturnResultT = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
 class VisionManager : public rclcpp_lifecycle::LifecycleNode
@@ -126,7 +125,6 @@ private:
     std::string & face_msg);
 
   void FaceDetProc(std::string);
-  void DownloadCallback(const ConnectorStatusT::SharedPtr msg);
   void SetThreadState(const std::string & thread_flag, bool & state);
   void WakeThread(AlgoStruct & algo);
   void ResetThread(AlgoStruct & algo);
@@ -138,8 +136,6 @@ private:
   rclcpp::Service<AlgoManagerT>::SharedPtr algo_manager_service_;
   rclcpp::Service<FaceManagerT>::SharedPtr facemanager_service_;
   rclcpp::Client<CameraServiceT>::SharedPtr camera_clinet_;
-
-  rclcpp::Subscription<ConnectorStatusT>::SharedPtr connector_sub_;
 
   rclcpp_lifecycle::LifecyclePublisher<PersonInfoT>::SharedPtr person_pub_;
   rclcpp_lifecycle::LifecyclePublisher<TrackingStatusT>::SharedPtr status_pub_;
