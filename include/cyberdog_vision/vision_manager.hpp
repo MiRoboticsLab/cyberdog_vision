@@ -67,6 +67,8 @@ using AlgoManagerT = protocol::srv::AlgoManager;
 using FaceManagerT = protocol::srv::FaceManager;
 using FaceResultT = protocol::msg::FaceResult;
 using TrackingStatusT = protocol::msg::TrackingStatus;
+using ConnectorStatusT = protocol::msg::ConnectorStatus;
+using CyberdogModelT = cyberdog::common::cyberdog_model;
 using ReturnResultT = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
 class VisionManager : public rclcpp_lifecycle::LifecycleNode
@@ -125,6 +127,11 @@ private:
     std::string & face_msg);
 
   void FaceDetProc(std::string);
+
+  void DownloadCallback(const ConnectorStatusT::SharedPtr msg);
+  void ModelDownload(std::shared_ptr<CyberdogModelT> & model);
+  int ModelReplace(std::shared_ptr<CyberdogModelT> & model);
+
   void SetThreadState(const std::string & thread_flag, bool & state);
   void WakeThread(AlgoStruct & algo);
   void ResetThread(AlgoStruct & algo);
@@ -136,6 +143,8 @@ private:
   rclcpp::Service<AlgoManagerT>::SharedPtr algo_manager_service_;
   rclcpp::Service<FaceManagerT>::SharedPtr facemanager_service_;
   rclcpp::Client<CameraServiceT>::SharedPtr camera_clinet_;
+
+  rclcpp::Subscription<ConnectorStatusT>::SharedPtr connector_sub_;
 
   rclcpp_lifecycle::LifecyclePublisher<PersonInfoT>::SharedPtr person_pub_;
   rclcpp_lifecycle::LifecyclePublisher<TrackingStatusT>::SharedPtr status_pub_;
@@ -157,6 +166,16 @@ private:
   std::shared_ptr<GestureRecognition> gesture_ptr_;
   std::shared_ptr<PersonReID> reid_ptr_;
   std::shared_ptr<KeypointsDetection> keypoints_ptr_;
+
+  std::shared_ptr<CyberdogModelT> track_model_;
+  std::shared_ptr<CyberdogModelT> body_gesture_model_;
+  std::shared_ptr<CyberdogModelT> face_age_model_;
+  std::shared_ptr<CyberdogModelT> face_det_model_;
+  std::shared_ptr<CyberdogModelT> face_emotion_model_;
+  std::shared_ptr<CyberdogModelT> face_feat_model_;
+  std::shared_ptr<CyberdogModelT> face_lmk_model_;
+  std::shared_ptr<CyberdogModelT> keypoints_model_;
+  std::shared_ptr<CyberdogModelT> reid_model_;
 
   std::map<std::string, std::vector<float>> face_library_;
 
