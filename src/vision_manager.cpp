@@ -63,6 +63,7 @@ VisionManager::VisionManager()
     };
   connector_sub_ = create_subscription<ConnectorStatusT>(
     "connector_state", rclcpp::SystemDefaultsQoS(), download_callback);
+  INFO("Vision manager constructor complated.");
 }
 
 ReturnResultT VisionManager::on_configure(const rclcpp_lifecycle::State & /*state*/)
