@@ -57,12 +57,16 @@ VisionManager::VisionManager()
   keypoints_model_ = std::make_shared<CyberdogModelT>("keypoints_detection");
   reid_model_ = std::make_shared<CyberdogModelT>("person_reid");
 
+  auto callback_group = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  rclcpp::SubscriptionOptions sub_options;
+  sub_options.callback_group = callback_group;
+
   // Create wifi info subscriber
   auto download_callback = [this](const ConnectorStatusT::SharedPtr msg) {
       DownloadCallback(msg);
     };
   connector_sub_ = create_subscription<ConnectorStatusT>(
-    "connector_state", rclcpp::SystemDefaultsQoS(), download_callback);
+    "connector_state", rclcpp::SystemDefaultsQoS(), download_callback, sub_options);
   INFO("Vision manager constructor complated.");
 }
 
