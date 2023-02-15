@@ -833,7 +833,7 @@ void VisionManager::GestureRecognize()
 void Convert(const std::vector<std::vector<cv::Point2f>> & from, BodyInfoT & to)
 {
   for (size_t i = 0; i < from.size(); ++i) {
-    to.infos[i].keypoints.resize(kKeypointsNum * sizeof(cv::Point2f));
+    to.infos[i].keypoints.clear();
     for (size_t num = 0; num < from[i].size(); ++num) {
       KeypointT keypoint;
       keypoint.x = from[i][num].x;

@@ -34,6 +34,12 @@ void KeypointsDetection::GetKeypointsInfo(
   const std::vector<InferBbox> & body_boxes,
   std::vector<std::vector<cv::Point2f>> & bodies_keypoints)
 {
+  bodies_keypoints.clear();
+  if (body_boxes.empty()) {
+    WARN("No person detected cannot extract keypoints. ");
+    return;
+  }
+
   XMImage xm_img;
   ImgConvert(img, xm_img);
   std::vector<pbox> infer_bboxes;
