@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdlib.h>
+#include <malloc.h>
 
 #include <utility>
 #include <algorithm>
@@ -83,6 +84,7 @@ ReturnResultT VisionManager::on_configure(const rclcpp_lifecycle::State & /*stat
 ReturnResultT VisionManager::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   INFO("Activating vision_manager. ");
+  CreateObject();
   if (!CallService(camera_clinet_, 0, "face-interval=1")) {
     ERROR("Start camera stream fail. ");
     return ReturnResultT::FAILURE;
@@ -113,16 +115,11 @@ ReturnResultT VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*sta
   person_pub_->on_deactivate();
   status_pub_->on_deactivate();
   face_result_pub_->on_deactivate();
+  ResetCudaDevs();
+  malloc_trim(0);
+  INFO("Malloc trim complated. ");
   INFO("Deactivate success. ");
   return ReturnResultT::SUCCESS;
-}
-
-void ResetCudaDevs()
-{
-  int dev_count = 0;
-  cudaSetDevice(dev_count);
-  cudaDeviceReset();
-  INFO("Cuda device reset complated. ");
 }
 
 ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
@@ -167,9 +164,6 @@ int VisionManager::Init()
     ERROR("Init shared memory or semaphore fail. ");
     return -1;
   }
-
-  // Create object
-  CreateObject();
 
   return 0;
 }
@@ -1347,6 +1341,20 @@ void VisionManager::ResetAlgo()
     std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
     algo_proc_.process_complated = false;
   }
+}
+
+void VisionManager::ResetCudaDevs()
+{
+  body_ptr_.reset();
+  face_ptr_.reset();
+  focus_ptr_.reset();
+  gesture_ptr_.reset();
+  reid_ptr_.reset();
+  keypoints_ptr_.reset();
+  int dev_count = 0;
+  cudaSetDevice(dev_count);
+  cudaDeviceReset();
+  INFO("Cuda device reset complated. ");
 }
 
 void VisionManager::DestoryThread()

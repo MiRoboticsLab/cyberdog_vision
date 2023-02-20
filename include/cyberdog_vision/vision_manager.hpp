@@ -136,6 +136,7 @@ private:
   void WakeThread(AlgoStruct & algo);
   void ResetThread(AlgoStruct & algo);
   void ResetAlgo();
+  void ResetCudaDevs();
   void DestoryThread();
 
 private:
