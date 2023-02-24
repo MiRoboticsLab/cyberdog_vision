@@ -87,7 +87,8 @@ protected:
 private:
   int Init();
   int InitIPC();
-  void CreateObject();
+  void CreateObjectAI();
+  void CreateObjectROS();
   void CreateThread();
   void ImageProc();
   void MainAlgoManager();
