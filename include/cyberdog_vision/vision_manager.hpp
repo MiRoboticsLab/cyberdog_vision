@@ -87,7 +87,8 @@ protected:
 private:
   int Init();
   int InitIPC();
-  void CreateObject();
+  void CreateObjectAI();
+  void CreateObjectROS();
   void CreateThread();
   void ImageProc();
   void MainAlgoManager();
@@ -136,6 +137,7 @@ private:
   void WakeThread(AlgoStruct & algo);
   void ResetThread(AlgoStruct & algo);
   void ResetAlgo();
+  void ResetCudaDevs();
   void DestoryThread();
 
 private:

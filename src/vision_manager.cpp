@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdlib.h>
+#include <malloc.h>
 
 #include <utility>
 #include <algorithm>
@@ -35,14 +36,25 @@ namespace cyberdog_vision
 {
 
 VisionManager::VisionManager()
-: rclcpp_lifecycle::LifecycleNode("vision_manager"), shm_addr_(nullptr), buf_size_(6),
-  open_face_(false), open_body_(false), open_gesture_(false), open_keypoints_(false),
-  open_reid_(false), open_focus_(false), is_activate_(false),
-  main_algo_deactivated_(false), depend_deactivated_(false), body_deactivated_(false),
-  face_deactivated_(false), focus_deactivated_(false), reid_deactivated_(false),
-  gesture_deactivated_(false), keypoints_deactivated_(false), face_complated_(false),
-  body_complated_(false), gesture_complated_(false), keypoints_complated_(false),
-  reid_complated_(false), focus_complated_(false)
+: rclcpp_lifecycle::LifecycleNode("vision_manager"),
+  img_proc_thread_(nullptr), main_manager_thread_(nullptr),
+  depend_manager_thread_(nullptr), body_det_thread_(nullptr),
+  face_thread_(nullptr), focus_thread_(nullptr),
+  gesture_thread_(nullptr), reid_thread_(nullptr),
+  keypoints_thread_(nullptr), body_ptr_(nullptr),
+  face_ptr_(nullptr), focus_ptr_(nullptr),
+  gesture_ptr_(nullptr), reid_ptr_(nullptr),
+  keypoints_ptr_(nullptr), shm_addr_(nullptr), buf_size_(6),
+  open_face_(false), open_body_(false), open_gesture_(false),
+  open_keypoints_(false), open_reid_(false), open_focus_(false),
+  is_activate_(false), main_algo_deactivated_(false),
+  depend_deactivated_(false), body_deactivated_(false),
+  face_deactivated_(false), focus_deactivated_(false),
+  reid_deactivated_(false), gesture_deactivated_(false),
+  keypoints_deactivated_(false), face_complated_(false),
+  body_complated_(false), gesture_complated_(false),
+  keypoints_complated_(false), reid_complated_(false),
+  focus_complated_(false)
 {
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 
@@ -89,6 +101,7 @@ ReturnResultT VisionManager::on_activate(const rclcpp_lifecycle::State & /*state
   }
   INFO("Start camera stream success. ");
   is_activate_ = true;
+  CreateObjectAI();
   CreateThread();
   person_pub_->on_activate();
   status_pub_->on_activate();
@@ -113,16 +126,9 @@ ReturnResultT VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*sta
   person_pub_->on_deactivate();
   status_pub_->on_deactivate();
   face_result_pub_->on_deactivate();
+  ResetCudaDevs();
   INFO("Deactivate success. ");
   return ReturnResultT::SUCCESS;
-}
-
-void ResetCudaDevs()
-{
-  int dev_count = 0;
-  cudaSetDevice(dev_count);
-  cudaDeviceReset();
-  INFO("Cuda device reset complated. ");
 }
 
 ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
@@ -144,13 +150,6 @@ ReturnResultT VisionManager::on_cleanup(const rclcpp_lifecycle::State & /*state*
   algo_manager_service_.reset();
   facemanager_service_.reset();
   camera_clinet_.reset();
-  body_ptr_.reset();
-  face_ptr_.reset();
-  focus_ptr_.reset();
-  gesture_ptr_.reset();
-  reid_ptr_.reset();
-  keypoints_ptr_.reset();
-  ResetCudaDevs();
   INFO("Clean up complated. ");
   return ReturnResultT::SUCCESS;
 }
@@ -168,8 +167,38 @@ int VisionManager::Init()
     return -1;
   }
 
-  // Create object
-  CreateObject();
+  // Create ROS object
+  CreateObjectROS();
+
+  // Replace with new AI model
+  INFO("Replace AI model.");
+  if (0 != ModelReplace(track_model_)) {
+    INFO("Replace auto track model fail. ");
+  }
+  if (0 != ModelReplace(body_gesture_model_)) {
+    INFO("Replace body gesture model fail. ");
+  }
+  if (0 != ModelReplace(face_age_model_)) {
+    INFO("Replace face age model fail. ");
+  }
+  if (0 != ModelReplace(face_det_model_)) {
+    INFO("Replace face detection model fail. ");
+  }
+  if (0 != ModelReplace(face_emotion_model_)) {
+    INFO("Replace face emotion model fail. ");
+  }
+  if (0 != ModelReplace(face_feat_model_)) {
+    INFO("Replace face feature model fail. ");
+  }
+  if (0 != ModelReplace(face_lmk_model_)) {
+    INFO("Replace face landmarks model fail. ");
+  }
+  if (0 != ModelReplace(keypoints_model_)) {
+    INFO("Replace keypoints model fail. ");
+  }
+  if (0 != ModelReplace(reid_model_)) {
+    INFO("Replace reid model fail. ");
+  }
 
   return 0;
 }
@@ -206,63 +235,49 @@ int VisionManager::InitIPC()
   return 0;
 }
 
-void VisionManager::CreateObject()
+void VisionManager::CreateObjectAI()
 {
-  // Replace with new AI model
-  INFO("Replace ai model.");
-  if (0 != ModelReplace(track_model_)) {
-    INFO("Replace auto track model fail. ");
-  }
-  if (0 != ModelReplace(body_gesture_model_)) {
-    INFO("Replace body gesture model fail. ");
-  }
-  if (0 != ModelReplace(face_age_model_)) {
-    INFO("Replace face age model fail. ");
-  }
-  if (0 != ModelReplace(face_det_model_)) {
-    INFO("Replace face detection model fail. ");
-  }
-  if (0 != ModelReplace(face_emotion_model_)) {
-    INFO("Replace face emotion model fail. ");
-  }
-  if (0 != ModelReplace(face_feat_model_)) {
-    INFO("Replace face feature model fail. ");
-  }
-  if (0 != ModelReplace(face_lmk_model_)) {
-    INFO("Replace face landmarks model fail. ");
-  }
-  if (0 != ModelReplace(keypoints_model_)) {
-    INFO("Replace keypoints model fail. ");
-  }
-  if (0 != ModelReplace(reid_model_)) {
-    INFO("Replace reid model fail. ");
-  }
-
   INFO("Create object start. ");
   // Create AI object
-  body_ptr_ = std::make_shared<BodyDetection>(
-    kModelPath + std::string("/body_gesture"));
+  if (open_body_) {
+    body_ptr_ = std::make_shared<BodyDetection>(
+      kModelPath + std::string("/body_gesture"));
+  }
 
-  face_ptr_ = std::make_shared<FaceRecognition>(
-    kModelPath + std::string(
-      "/face_recognition"), true, true);
+  if (open_face_) {
+    face_ptr_ = std::make_shared<FaceRecognition>(
+      kModelPath + std::string(
+        "/face_recognition"), true, true);
+  }
 
-  focus_ptr_ = std::make_shared<AutoTrack>(
-    kModelPath + std::string("/auto_track"));
+  if (open_focus_) {
+    focus_ptr_ = std::make_shared<AutoTrack>(
+      kModelPath + std::string("/auto_track"));
+  }
 
-  gesture_ptr_ = std::make_shared<GestureRecognition>(
-    kModelPath + std::string("/body_gesture"));
+  if (open_gesture_) {
+    gesture_ptr_ = std::make_shared<GestureRecognition>(
+      kModelPath + std::string("/body_gesture"));
+  }
 
-  reid_ptr_ =
-    std::make_shared<PersonReID>(
-    kModelPath +
-    std::string("/person_reid"));
+  if (open_reid_) {
+    reid_ptr_ =
+      std::make_shared<PersonReID>(
+      kModelPath +
+      std::string("/person_reid"));
+  }
 
-  keypoints_ptr_ = std::make_shared<KeypointsDetection>(
-    kModelPath + std::string("/keypoints_detection"));
+  if (open_keypoints_) {
+    keypoints_ptr_ = std::make_shared<KeypointsDetection>(
+      kModelPath + std::string("/keypoints_detection"));
+  }
 
-  INFO("Create object complated. ");
+  INFO("Create AI object complated. ");
+}
 
+void VisionManager::CreateObjectROS()
+{
+  INFO("Create ROS object. ");
   // Create service server
   tracking_service_ = create_service<BodyRegionT>(
     "tracking_object", std::bind(
@@ -294,13 +309,28 @@ void VisionManager::CreateThread()
 {
   img_proc_thread_ = std::make_shared<std::thread>(&VisionManager::ImageProc, this);
   main_manager_thread_ = std::make_shared<std::thread>(&VisionManager::MainAlgoManager, this);
-  depend_manager_thread_ = std::make_shared<std::thread>(&VisionManager::DependAlgoManager, this);
-  body_det_thread_ = std::make_shared<std::thread>(&VisionManager::BodyDet, this);
-  face_thread_ = std::make_shared<std::thread>(&VisionManager::FaceRecognize, this);
-  focus_thread_ = std::make_shared<std::thread>(&VisionManager::FocusTrack, this);
-  gesture_thread_ = std::make_shared<std::thread>(&VisionManager::GestureRecognize, this);
-  reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
-  keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
+  // Create thread depends algorithm selection
+  if (open_reid_ || open_gesture_ || open_keypoints_) {
+    depend_manager_thread_ = std::make_shared<std::thread>(&VisionManager::DependAlgoManager, this);
+  }
+  if (open_body_) {
+    body_det_thread_ = std::make_shared<std::thread>(&VisionManager::BodyDet, this);
+  }
+  if (open_face_) {
+    face_thread_ = std::make_shared<std::thread>(&VisionManager::FaceRecognize, this);
+  }
+  if (open_focus_) {
+    focus_thread_ = std::make_shared<std::thread>(&VisionManager::FocusTrack, this);
+  }
+  if (open_gesture_) {
+    gesture_thread_ = std::make_shared<std::thread>(&VisionManager::GestureRecognize, this);
+  }
+  if (open_reid_) {
+    reid_thread_ = std::make_shared<std::thread>(&VisionManager::ReIDProc, this);
+  }
+  if (open_keypoints_) {
+    keypoints_thread_ = std::make_shared<std::thread>(&VisionManager::KeypointsDet, this);
+  }
 }
 
 void VisionManager::ImageProc()
@@ -1139,6 +1169,7 @@ void VisionManager::publishFaceResult(
   int result, const std::string & face_name, cv::Mat & img,
   std::string & face_msg)
 {
+  INFO("Publish face result. ");
   auto face_result_msg = std::make_unique<FaceResultT>();
   size_t png_size;
   unsigned char * png_data;
@@ -1182,7 +1213,7 @@ void VisionManager::FaceDetProc(std::string face_name)
   endlib_feats = FaceManager::getInstance()->getFeatures();
   std::time_t cur_time = std::time(NULL);
 
-  while (std::difftime(std::time(NULL), cur_time) < 40 && face_detect_) {
+  while (face_ptr_ != nullptr && std::difftime(std::time(NULL), cur_time) < 40 && face_detect_) {
     get_face_timeout = false;
     std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx);
     global_img_buf_.cond.wait(lk_img, [this] {return global_img_buf_.is_filled;});
@@ -1229,7 +1260,7 @@ void VisionManager::FaceDetProc(std::string face_name)
   }
 
   /*it time out publish error*/
-  if (get_face_timeout && face_detect_) {
+  if (face_ptr_ != nullptr && get_face_timeout && face_detect_) {
     checkFacePose_Msg = "timeout";
     publishFaceResult(3, face_name, mat_tmp, checkFacePose_Msg);
   }
@@ -1307,8 +1338,12 @@ void VisionManager::ResetThread(AlgoStruct & algo)
 
 void VisionManager::ResetAlgo()
 {
-  focus_ptr_->ResetTracker();
-  reid_ptr_->ResetTracker();
+  if (open_focus_) {
+    focus_ptr_->ResetTracker();
+  }
+  if (open_reid_) {
+    reid_ptr_->ResetTracker();
+  }
   open_face_ = false;
   open_body_ = false;
   open_gesture_ = false;
@@ -1349,6 +1384,22 @@ void VisionManager::ResetAlgo()
   }
 }
 
+void VisionManager::ResetCudaDevs()
+{
+  body_ptr_.reset();
+  face_ptr_.reset();
+  focus_ptr_.reset();
+  gesture_ptr_.reset();
+  reid_ptr_.reset();
+  keypoints_ptr_.reset();
+  int dev_count = 0;
+  cudaSetDevice(dev_count);
+  cudaDeviceReset();
+  INFO("Cuda device reset complated. ");
+  malloc_trim(0);
+  INFO("Malloc trim complated. ");
+}
+
 void VisionManager::DestoryThread()
 {
   if (img_proc_thread_->joinable()) {
@@ -1356,7 +1407,7 @@ void VisionManager::DestoryThread()
     INFO("img_proc_thread_ joined. ");
   }
 
-  if (gesture_thread_->joinable()) {
+  if (open_gesture_ && gesture_thread_->joinable()) {
     if (!gesture_deactivated_) {
       WakeThread(gesture_struct_);
     }
@@ -1364,7 +1415,7 @@ void VisionManager::DestoryThread()
     INFO("gesture_thread_ joined. ");
   }
 
-  if (reid_thread_->joinable()) {
+  if (open_reid_ && reid_thread_->joinable()) {
     if (!reid_deactivated_) {
       WakeThread(reid_struct_);
     }
@@ -1372,7 +1423,7 @@ void VisionManager::DestoryThread()
     INFO("reid_thread_ joined. ");
   }
 
-  if (keypoints_thread_->joinable()) {
+  if (open_keypoints_ && keypoints_thread_->joinable()) {
     if (!keypoints_deactivated_) {
       WakeThread(keypoints_struct_);
     }
@@ -1380,7 +1431,7 @@ void VisionManager::DestoryThread()
     INFO("keypoints_thread_ joined. ");
   }
 
-  if (face_thread_->joinable()) {
+  if (open_face_ && face_thread_->joinable()) {
     if (!face_deactivated_) {
       WakeThread(face_struct_);
     }
@@ -1388,7 +1439,7 @@ void VisionManager::DestoryThread()
     INFO("face_thread_ joined. ");
   }
 
-  if (focus_thread_->joinable()) {
+  if (open_focus_ && focus_thread_->joinable()) {
     if (!focus_deactivated_) {
       WakeThread(focus_struct_);
     }
@@ -1396,7 +1447,7 @@ void VisionManager::DestoryThread()
     INFO("focus_thread_ joined. ");
   }
 
-  if (body_det_thread_->joinable()) {
+  if (open_body_ && body_det_thread_->joinable()) {
     if (!body_deactivated_) {
       WakeThread(body_struct_);
     }
@@ -1404,23 +1455,26 @@ void VisionManager::DestoryThread()
     INFO("body_det_thread_ joined. ");
   }
 
-  {
-    std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
-    algo_proc_.process_complated = true;
-    algo_proc_.cond.notify_one();
-    INFO("Destory notify to pub. ");
-  }
-  if (depend_manager_thread_->joinable()) {
-    if (!depend_deactivated_) {
-      std::unique_lock<std::mutex> lk_body(body_results_.mtx);
-      if (!body_results_.is_filled) {
-        body_results_.is_filled = true;
-        body_results_.cond.notify_one();
-        INFO("Destory notify depend thread. ");
-      }
+  if (open_reid_ || open_gesture_ || open_keypoints_) {
+    {
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx);
+      algo_proc_.process_complated = true;
+      algo_proc_.cond.notify_one();
+      INFO("Destory notify to pub. ");
     }
-    depend_manager_thread_->join();
-    INFO("depend_manager_thread_ joined. ");
+
+    if (depend_manager_thread_->joinable()) {
+      if (!depend_deactivated_) {
+        std::unique_lock<std::mutex> lk_body(body_results_.mtx);
+        if (!body_results_.is_filled) {
+          body_results_.is_filled = true;
+          body_results_.cond.notify_one();
+          INFO("Destory notify depend thread. ");
+        }
+      }
+      depend_manager_thread_->join();
+      INFO("depend_manager_thread_ joined. ");
+    }
   }
 
   if (main_manager_thread_->joinable()) {

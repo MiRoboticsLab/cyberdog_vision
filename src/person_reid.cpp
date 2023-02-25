@@ -29,7 +29,7 @@ PersonReID::PersonReID(const std::string & model_path)
   INFO("===Init PersonReID===");
   std::string model_reid = model_path + "/reid_v4_mid.engine";
   if (0 != REID_Init(reid_ptr_, model_reid.c_str(), gpu_id_)) {
-    throw std::logic_error("Init person reid algo fial. ");
+    throw std::logic_error("Init person reid algo fail. ");
   }
 }
 
