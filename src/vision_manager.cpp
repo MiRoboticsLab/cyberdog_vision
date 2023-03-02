@@ -47,7 +47,7 @@ VisionManager::VisionManager()
   keypoints_ptr_(nullptr), shm_addr_(nullptr), buf_size_(6),
   open_face_(false), open_body_(false), open_gesture_(false),
   open_keypoints_(false), open_reid_(false), open_focus_(false),
-  is_activate_(false), main_algo_deactivated_(false),
+  open_face_manager_(false), is_activate_(false), main_algo_deactivated_(false),
   depend_deactivated_(false), body_deactivated_(false),
   face_deactivated_(false), focus_deactivated_(false),
   reid_deactivated_(false), gesture_deactivated_(false),
@@ -244,7 +244,7 @@ void VisionManager::CreateObjectAI()
       kModelPath + std::string("/body_gesture"));
   }
 
-  if (open_face_) {
+  if (open_face_ || open_face_manager_) {
     face_ptr_ = std::make_shared<FaceRecognition>(
       kModelPath + std::string(
         "/face_recognition"), true, true);
@@ -308,8 +308,11 @@ void VisionManager::CreateObjectROS()
 void VisionManager::CreateThread()
 {
   img_proc_thread_ = std::make_shared<std::thread>(&VisionManager::ImageProc, this);
-  main_manager_thread_ = std::make_shared<std::thread>(&VisionManager::MainAlgoManager, this);
+
   // Create thread depends algorithm selection
+  if (!open_face_manager_) {
+    main_manager_thread_ = std::make_shared<std::thread>(&VisionManager::MainAlgoManager, this);
+  }
   if (open_reid_ || open_gesture_ || open_keypoints_) {
     depend_manager_thread_ = std::make_shared<std::thread>(&VisionManager::DependAlgoManager, this);
   }
@@ -1004,6 +1007,11 @@ void VisionManager::SetAlgoState(const AlgoListT & algo_list, const bool & value
     case AlgoListT::ALGO_FOCUS:
       open_focus_ = value;
       break;
+    case AlgoListT::FACE_MANAGER:
+      open_face_manager_ = value;
+      if (value) {
+        LoadFaceLibrary(face_library_);
+      }
     default:
       break;
   }
@@ -1351,6 +1359,7 @@ void VisionManager::ResetAlgo()
   open_keypoints_ = false;
   open_reid_ = false;
   open_focus_ = false;
+  open_face_manager_ = false;
   main_algo_deactivated_ = false;
   depend_deactivated_ = false;
   body_deactivated_ = false;
@@ -1478,7 +1487,7 @@ void VisionManager::DestoryThread()
     }
   }
 
-  if (main_manager_thread_->joinable()) {
+  if (!open_face_manager_ && main_manager_thread_->joinable()) {
     if (!main_algo_deactivated_) {
       std::lock(global_img_buf_.mtx, algo_proc_.mtx);
       std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
