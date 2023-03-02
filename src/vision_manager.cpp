@@ -440,6 +440,7 @@ void VisionManager::MainAlgoManager()
         algo_result_ = person_info;
       }
       if (open_body_ || open_focus_) {
+        INFO("MainAlgoManager: Publish processing status: %d", (int)processing_status_.status);
         status_pub_->publish(processing_status_);
       }
       algo_proc_.process_complated = false;
@@ -1479,15 +1480,24 @@ void VisionManager::DestoryThread()
 
   if (main_manager_thread_->joinable()) {
     if (!main_algo_deactivated_) {
-      std::unique_lock<std::mutex> lk(global_img_buf_.mtx);
+      std::lock(global_img_buf_.mtx, algo_proc_.mtx);
+      std::unique_lock<std::mutex> lk_img(global_img_buf_.mtx, std::adopt_lock);
+      std::unique_lock<std::mutex> lk_proc(algo_proc_.mtx, std::adopt_lock);
       if (!global_img_buf_.is_filled) {
         global_img_buf_.is_filled = true;
         global_img_buf_.cond.notify_one();
+        INFO("Destory notify main thread. ");
+      }
+      if (!algo_proc_.process_complated) {
+        algo_proc_.process_complated = true;
+        algo_proc_.cond.notify_one();
+        INFO("Destory notify main thread to pub. ");
       }
     }
     main_manager_thread_->join();
     INFO("main_manager_thread_ joined. ");
   }
+  INFO("Destory thread complated. ");
 }
 
 VisionManager::~VisionManager()
