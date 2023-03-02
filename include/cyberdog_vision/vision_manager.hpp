@@ -208,6 +208,7 @@ private:
   bool open_keypoints_;
   bool open_reid_;
   bool open_focus_;
+  bool open_face_manager_;
   bool is_activate_;
   bool face_detect_;
 
