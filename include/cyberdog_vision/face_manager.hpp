@@ -16,6 +16,9 @@
 #ifndef CYBERDOG_VISION__FACE_MANAGER_HPP_
 #define CYBERDOG_VISION__FACE_MANAGER_HPP_
 
+#include <map>
+#include <vector>
+#include <string>
 #include "cyberdog_vision/face_recognition.hpp"
 
 namespace cyberdog_vision
@@ -119,7 +122,6 @@ private:
 
   /**/
   SizedVector<float, 6> m_faceStats[statsFaceTypeMax];
-
 };
 
 }  // namespace cyberdog_vision

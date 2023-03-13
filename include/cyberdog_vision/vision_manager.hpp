@@ -124,8 +124,7 @@ private:
     std::shared_ptr<FaceManagerT::Response> res);
 
   void publishFaceResult(
-    int result, const std::string & name, cv::Mat & img,
-    std::string & face_msg);
+    int result, std::string & face_msg);
 
   void FaceDetProc(std::string);
 

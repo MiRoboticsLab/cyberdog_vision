@@ -1117,7 +1117,9 @@ void VisionManager::FaceManagerService(
 
   switch (request->command) {
     case FaceManagerT::Request::ADD_FACE:
-      cout << "addFaceInfo: " << request->username << " is_host: " << request->ishost << endl;
+      INFO(
+        "addFaceInfo: %s, is_host: %d", request->username.c_str(),
+        static_cast<int>(request->ishost));
       if (request->username.length() == 0) {
         response->result = -1;
       } else {
@@ -1129,13 +1131,14 @@ void VisionManager::FaceManagerService(
       }
       break;
     case FaceManagerT::Request::CANCLE_ADD_FACE:
-      cout << "cancelAddFace" << endl;
+      INFO("cancelAddFace");
       face_detect_ = false;
       response->result = FaceManager::getInstance()->cancelAddFace();
       break;
     case FaceManagerT::Request::CONFIRM_LAST_FACE:
-      cout << "confirmFace username:" << request->username << " is_host:" << request->ishost <<
-        endl;
+      INFO(
+        "confirmFace username : %s, is_host: %d", request->username.c_str(),
+        static_cast<int>(request->ishost));
       if (request->username.length() == 0) {
         response->result = -1;
       } else {
@@ -1145,8 +1148,9 @@ void VisionManager::FaceManagerService(
       }
       break;
     case FaceManagerT::Request::UPDATE_FACE_ID:
-      cout << "updateFaceId username:" << request->username << " ori_name:" << request->oriname <<
-        endl;
+      INFO(
+        "updateFaceId username : %s, is_host: %d", request->username.c_str(),
+        static_cast<int>(request->ishost));
       if (request->username.length() == 0 || request->oriname.length() == 0) {
         response->result = -1;
       } else {
@@ -1156,7 +1160,7 @@ void VisionManager::FaceManagerService(
       }
       break;
     case FaceManagerT::Request::DELETE_FACE:
-      cout << "deleteFace username:" << request->username << endl;
+      INFO("deleteFace username: %s", request->username.c_str());
       if (request->username.length() == 0) {
         response->result = -1;
       } else {
@@ -1165,7 +1169,7 @@ void VisionManager::FaceManagerService(
       break;
     case FaceManagerT::Request::GET_ALL_FACES:
       response->msg = FaceManager::getInstance()->getAllFaces();
-      cout << "getAllFaces " << response->msg << endl;
+      INFO("getAllFaces : %s", response->msg.c_str());
       response->result = 0;
       break;
     default:
@@ -1175,40 +1179,13 @@ void VisionManager::FaceManagerService(
 }
 
 void VisionManager::publishFaceResult(
-  int result, const std::string & face_name, cv::Mat & img,
-  std::string & face_msg)
+  int result, std::string & face_msg)
 {
   INFO("Publish face result. ");
   auto face_result_msg = std::make_unique<FaceResultT>();
-  size_t png_size;
-  unsigned char * png_data;
-
   face_result_msg->result = result;
   face_result_msg->msg = face_msg;
-
-  if (result == 0 || result == 17) {
-    std::vector<unsigned char> png_buff;
-    std::vector<int> png_param = std::vector<int>(2);
-    png_param[0] = 16;  // CV_IMWRITE_PNG_QUALITY;
-    png_param[1] = 3;  // default(95)
-
-    imencode(".png", img, png_buff, png_param);
-    png_size = png_buff.size();
-    png_data = (unsigned char *)malloc(png_size);
-    for (size_t i = 0; i < png_size; i++) {
-      png_data[i] = png_buff[i];
-    }
-    face_result_msg->face_images.resize(1);
-    face_result_msg->face_images[0].header.frame_id = face_name;
-    face_result_msg->face_images[0].format = "png";
-    face_result_msg->face_images[0].data.resize(png_size);
-    memcpy(&(face_result_msg->face_images[0].data[0]), png_data, png_size);
-    face_result_pub_->publish(std::move(face_result_msg));
-
-    free(png_data);
-  } else {
-    face_result_pub_->publish(std::move(face_result_msg));
-  }
+  face_result_pub_->publish(std::move(face_result_msg));
 }
 
 void VisionManager::FaceDetProc(std::string face_name)
@@ -1261,7 +1238,7 @@ void VisionManager::FaceDetProc(std::string face_name)
         FaceManager::getInstance()->addFaceFeatureCacheInfo(faces_info);
       }
     }
-    publishFaceResult(checkFacePose_ret, face_name, mat_tmp, checkFacePose_Msg);
+    publishFaceResult(checkFacePose_ret, checkFacePose_Msg);
     if (checkFacePose_ret == 0 || checkFacePose_ret == 17) {
       break;
     }
@@ -1271,7 +1248,7 @@ void VisionManager::FaceDetProc(std::string face_name)
   /*it time out publish error*/
   if (face_ptr_ != nullptr && get_face_timeout && face_detect_) {
     checkFacePose_Msg = "timeout";
-    publishFaceResult(3, face_name, mat_tmp, checkFacePose_Msg);
+    publishFaceResult(3, checkFacePose_Msg);
   }
 }
 
