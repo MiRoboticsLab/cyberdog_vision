@@ -24,6 +24,8 @@
 #include <numeric>
 
 #include "cyberdog_vision/face_manager.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
+#include "protocol/msg/face_result.hpp"
 
 namespace cyberdog_vision
 {
@@ -76,7 +78,7 @@ const std::string FaceManager::getFaceDataPath()
 void FaceManager::initialize()
 {
   if (!loadFeatures()) {
-    std::cout << "Failed to load face features." << std::endl;
+    INFO("Failed to load face features.");
   }
 }
 
@@ -97,12 +99,11 @@ bool FaceManager::updateFeaturesFile()
   vector<float> face_feature;
   cv::FileStorage fs(faceinfofile, cv::FileStorage::WRITE);
   if (!fs.isOpened()) {
-    cout << "cannot open xml file to write" << endl;
+    INFO("cannot open xml file to write.");
     return false;
   }
   fs << "UserFaceInfo" << "[";
   for (feature_iter = m_features.begin(); feature_iter != m_features.end(); feature_iter++) {
-    //std::cout << feature_iter->first << " : " << feature_iter->second << std::endl;
     face_name = feature_iter->first;
     face_feature = feature_iter->second;
     is_host = m_hostMap[face_name];
@@ -118,7 +119,7 @@ bool FaceManager::loadFeatures()
   std::lock_guard<std::mutex> lock(m_mutex);
 
   if (access(label_path, 0) != 0) {
-    std::cout << "faces path not found." << std::endl;
+    INFO("faces path not found.");
     umask(0);
     mkdir("/home/mi/.faces/", 0755);
     return true;
@@ -131,7 +132,7 @@ bool FaceManager::loadFeatures()
 
   cv::FileStorage file_read(faceinfofile, cv::FileStorage::READ);
   if (!file_read.isOpened()) {
-    cout << "cannot open yaml file to write" << endl;
+    INFO("cannot open yaml file to write");
     return false;
   }
 
@@ -144,7 +145,7 @@ bool FaceManager::loadFeatures()
     m_features[face_name] = face_feature;
     m_hostMap[face_name] = is_host;
 
-    std::cout << "Load known face info " << face_name << "host:" << is_host << std::endl;
+    INFO("Load known face info  %s host: %d", face_name.c_str(), static_cast<int>(is_host));
   }
   file_read.release();
 
@@ -153,10 +154,9 @@ bool FaceManager::loadFeatures()
 
 int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::string & msg)
 {
-  float mean[statsFaceTypeMax];
-  double stdev[statsFaceTypeMax];
+  float mean[5];
+  double stdev[5];
 
-  //std::cout << "faceinfo.size: " << faceinfos.size() << std::endl;
   m_faceStats[statsFaceNum].push_back(faceinfos.size());
   if (faceinfos.size() != 1) {
     m_faceStats[statsFaceYaw].push_back(0.0f);
@@ -179,18 +179,18 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::stri
       if (mean[statsFaceNum] == 1.0f) {
       } else if (mean[statsFaceNum] == 0.0f) {
         msg = "No face found!!";
-        return 7;
+        return protocol::msg::FaceResult::RESULT_NO_FACE_FOUND;
       } else {
         msg = "More than 1 face found!!";
-        return 8;
+        return protocol::msg::FaceResult::RESULT_MULTI_FACE_FOUND;
       }
     } else {
       msg = "keep stable!!";
-      return 9;
+      return protocol::msg::FaceResult::RESULT_KEEP_STABLE;
     }
   } else {
     msg = "keep stable!!";
-    return 9;
+    return protocol::msg::FaceResult::RESULT_KEEP_STABLE;
   }
 
   // face distance
@@ -198,14 +198,13 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::stri
     get_mean_stdev(m_faceStats[statsFaceArea].vector(), mean[statsFaceArea], stdev[statsFaceArea]);
     if (stdev[statsFaceArea] < FACE_AREA_STABLE_THRES) {
       if (mean[statsFaceArea] > FACE_AREA_LEGAL_THRES) {
-        //cout << "Nice, distance is OK!!" <<  mean[statsFaceArea] << endl;
       } else {
         msg = "Distance is NOT OK!!";
-        return 11;
+        return protocol::msg::FaceResult::RESULT_DISTANCE_NOT_SATISFIED;
       }
     } else {
       msg = "keep stable!!";
-      return 9;
+      return protocol::msg::FaceResult::RESULT_KEEP_STABLE;
     }
   }
 
@@ -223,43 +222,40 @@ int FaceManager::checkFacePose(std::vector<EntryFaceInfo> & faceinfos, std::stri
       stdev[statsFacePitch] < FACE_POSE_STABLE_THRES &&
       stdev[statsFaceRow] < FACE_POSE_STABLE_THRES)
     {
-      //cout << "yaw:" << mean[statsFaceYaw] << endl;
-      //cout << "pitch: " << mean[statsFacePitch] << endl;
-      //cout << "row: " << mean[statsFaceRow] << endl;
       if (abs(mean[statsFaceYaw]) <= FACE_POSE_YAW_LEGAL_THRES &&
         abs(mean[statsFacePitch]) <= FACE_POSE_PITCH_LEGAL_THRES &&
         abs(mean[statsFaceRow]) <= FACE_POSE_ROW_LEGAL_THRES)
       {
         msg = "check Face Pose success!!";
-        return 0;
+        return protocol::msg::FaceResult::RESULT_SUCCESS;
       } else if (mean[statsFaceYaw] > FACE_POSE_YAW_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_LEFT!!";
-        return 12;
+        return protocol::msg::FaceResult::RESULT_DEGREE_HEAD_LEFT;
       } else if (mean[statsFaceYaw] < -FACE_POSE_YAW_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_RIGHT!!";
-        return 13;
+        return protocol::msg::FaceResult::RESULT_DEGREE_HEAD_RIGHT;
       } else if (mean[statsFacePitch] > FACE_POSE_PITCH_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_DOWN";
-        return 14;
+        return protocol::msg::FaceResult::RESULT_DEGREE_HEAD_DOWN;
       } else if (mean[statsFacePitch] < -FACE_POSE_PITCH_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_UP!!";
-        return 15;
+        return protocol::msg::FaceResult::RESULT_DEGREE_HEAD_UP;
       } else if (abs(mean[statsFaceRow]) > FACE_POSE_ROW_LEGAL_THRES) {
         msg = "Degree is NOT OK: HEAD_TILT !!";
-        return 16;
+        return protocol::msg::FaceResult::RESULT_DEGREE_HEAD_TILT;
       } else {
         msg = "Degree is NOT OK!!";
-        return 10;
+        return protocol::msg::FaceResult::RESULT_DEGREE_NOT_SATISFIED;
       }
     } else {
       msg = "keep stable!!";
-      return 9;
+      return protocol::msg::FaceResult::RESULT_KEEP_STABLE;
     }
   }
 
-  //can't reach here
+  // can't reach here
   msg = "keep stable!!";
-  return 9;
+  return protocol::msg::FaceResult::RESULT_KEEP_STABLE;
 }
 
 int FaceManager::addFaceIDCacheInfo(std::string & name, bool is_host)
@@ -287,16 +283,16 @@ int FaceManager::cancelAddFace()
 int FaceManager::confirmFace(std::string & name, bool is_host)
 {
   std::string filename;
+  INFO(
+    "confirm last face name:  %s, is_host: %d", m_faceIdCached.name,
+    static_cast<int>(m_faceIdCached.is_host));
 
-  std::cout << "confirm last face name: " << m_faceIdCached.name << " is_host: " <<
-    m_faceIdCached.is_host << std::endl;
   if (m_faceIdCached.name.compare(name) != 0 || is_host != m_faceIdCached.is_host) {
-    std::cout << "confirmFace face name: " << name << " but cache name:" << m_faceIdCached.name <<
-      std::endl;
+    INFO("confirmFace face name: %s but cache name: %s", name.c_str(), m_faceIdCached.name.c_str());
     return -1;
   }
   if (m_faceFeatsCached.empty()) {
-    std::cout << "Error:faceFeatsCached empty..." << std::endl;
+    INFO("Error:faceFeatsCached empty...");
     return -1;
   }
   m_mutex.lock();
@@ -309,7 +305,7 @@ int FaceManager::confirmFace(std::string & name, bool is_host)
   m_faceFeatsCached.clear();
   m_faceIdCached.name = "";
   m_faceIdCached.is_host = false;
-  //m_faceCacheSize = 0;
+  // m_faceCacheSize = 0;
 
   return 0;
 }
@@ -317,7 +313,7 @@ int FaceManager::confirmFace(std::string & name, bool is_host)
 int FaceManager::updateFaceId(std::string & ori_name, std::string & new_name)
 {
   if (m_features.find(ori_name) == m_features.end()) {
-    std::cout << "Face name not fount " << ori_name << std::endl;
+    INFO("Face name not found %s", ori_name.c_str());
     return -1;
   }
 
@@ -327,17 +323,14 @@ int FaceManager::updateFaceId(std::string & ori_name, std::string & new_name)
   m_hostMap[new_name] = m_hostMap[ori_name];
   m_hostMap.erase(ori_name);
   m_mutex.unlock();
-
   updateFeaturesFile();
-
   return 0;
-
 }
 
 int FaceManager::deleteFace(std::string & face_name)
 {
   if (m_features.find(face_name) == m_features.end()) {
-    std::cout << "Face name not found:" << face_name << std::endl;
+    INFO("Face name not found %s", face_name.c_str());
     return 0;
   }
 
@@ -354,7 +347,6 @@ int FaceManager::deleteFace(std::string & face_name)
 
 std::string FaceManager::getAllFaces()
 {
-
   std::string all_face_info;
   std::string face_name;
   int is_host;
