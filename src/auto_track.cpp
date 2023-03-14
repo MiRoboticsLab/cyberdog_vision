@@ -38,6 +38,10 @@ bool AutoTrack::SetTracker(const cv::Mat & img, const cv::Rect & bbox)
     WARN("Image empty set tracker fail.");
     return false;
   }
+  if (0 == bbox.width && 0 == bbox.height) {
+    WARN("Bbox to track is not valid.");
+    return false;
+  }
 
   XMImage xm_img;
   ImgConvert(img, xm_img);

@@ -117,7 +117,6 @@ ReturnResultT VisionManager::on_deactivate(const rclcpp_lifecycle::State & /*sta
   is_activate_ = false;
   DestoryThread();
   ResetAlgo();
-  INFO("Destory thread complated. ");
   if (!CallService(camera_clinet_, 0, "face-interval=0")) {
     ERROR("Close camera stream fail. ");
     return ReturnResultT::FAILURE;
