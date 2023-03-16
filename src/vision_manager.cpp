@@ -169,36 +169,6 @@ int VisionManager::Init()
   // Create ROS object
   CreateObjectROS();
 
-  // Replace with new AI model
-  INFO("Replace AI model.");
-  if (0 != ModelReplace(track_model_)) {
-    INFO("Replace auto track model fail. ");
-  }
-  if (0 != ModelReplace(body_gesture_model_)) {
-    INFO("Replace body gesture model fail. ");
-  }
-  if (0 != ModelReplace(face_age_model_)) {
-    INFO("Replace face age model fail. ");
-  }
-  if (0 != ModelReplace(face_det_model_)) {
-    INFO("Replace face detection model fail. ");
-  }
-  if (0 != ModelReplace(face_emotion_model_)) {
-    INFO("Replace face emotion model fail. ");
-  }
-  if (0 != ModelReplace(face_feat_model_)) {
-    INFO("Replace face feature model fail. ");
-  }
-  if (0 != ModelReplace(face_lmk_model_)) {
-    INFO("Replace face landmarks model fail. ");
-  }
-  if (0 != ModelReplace(keypoints_model_)) {
-    INFO("Replace keypoints model fail. ");
-  }
-  if (0 != ModelReplace(reid_model_)) {
-    INFO("Replace reid model fail. ");
-  }
-
   return 0;
 }
 
@@ -236,8 +206,38 @@ int VisionManager::InitIPC()
 
 void VisionManager::CreateObjectAI()
 {
-  INFO("Create object start. ");
+  // Replace with new AI model
+  INFO("Replace AI model.");
+  if (0 != ModelReplace(track_model_)) {
+    INFO("Replace auto track model fail. ");
+  }
+  if (0 != ModelReplace(body_gesture_model_)) {
+    INFO("Replace body gesture model fail. ");
+  }
+  if (0 != ModelReplace(face_age_model_)) {
+    INFO("Replace face age model fail. ");
+  }
+  if (0 != ModelReplace(face_det_model_)) {
+    INFO("Replace face detection model fail. ");
+  }
+  if (0 != ModelReplace(face_emotion_model_)) {
+    INFO("Replace face emotion model fail. ");
+  }
+  if (0 != ModelReplace(face_feat_model_)) {
+    INFO("Replace face feature model fail. ");
+  }
+  if (0 != ModelReplace(face_lmk_model_)) {
+    INFO("Replace face landmarks model fail. ");
+  }
+  if (0 != ModelReplace(keypoints_model_)) {
+    INFO("Replace keypoints model fail. ");
+  }
+  if (0 != ModelReplace(reid_model_)) {
+    INFO("Replace reid model fail. ");
+  }
+
   // Create AI object
+  INFO("Create object start. ");
   if (open_body_) {
     body_ptr_ = std::make_shared<BodyDetection>(
       kModelPath + std::string("/body_gesture"));
@@ -351,6 +351,7 @@ void VisionManager::ImageProc()
     memcpy(&time, reinterpret_cast<char *>(shm_addr_), sizeof(uint64_t));
     simg.header.stamp.sec = time / 1000000000;
     simg.header.stamp.nanosec = time % 1000000000;
+    INFO("Received rgb image, ts: %.9d.%.9d", simg.header.stamp.sec, simg.header.stamp.nanosec);
     if (0 != SignalSem(sem_set_id_, 0)) {return;}
     if (0 != SignalSem(sem_set_id_, 1)) {return;}
 
@@ -1276,9 +1277,9 @@ void VisionManager::ModelDownload(std::shared_ptr<CyberdogModelT> & model)
   model->SetTimeout(600);
   int32_t code = model->UpdateModels();
   if (0 == code) {
-    INFO("Update model from Fds success. ");
+    INFO("Download model from Fds success. ");
   } else {
-    ERROR("Update model from Fds fail. ");
+    ERROR("Download model from Fds fail. ");
   }
 }
 
