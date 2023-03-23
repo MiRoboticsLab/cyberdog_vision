@@ -19,7 +19,7 @@
 #include <vector>
 #include <memory>
 
-#include "3rdparty/person_keypoints.h"
+#include "person_keypoints.h"  // NOLINT
 #include "common_type.hpp"
 
 namespace cyberdog_vision

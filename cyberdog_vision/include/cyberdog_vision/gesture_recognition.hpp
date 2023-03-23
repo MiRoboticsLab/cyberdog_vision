@@ -19,7 +19,7 @@
 #include <vector>
 #include <memory>
 
-#include "3rdparty/hand_gesture.h"
+#include "hand_gesture.h"  // NOLINT
 #include "common_type.hpp"
 
 namespace cyberdog_vision
