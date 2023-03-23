@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Xiaomi Corporation
+// Copyright (c) 2023-2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ namespace cyberdog_vision
 union semun {
   int val;    // value for SETVAL
   struct semid_ds * buf;   // buffer for IPC_STAT&IPC_SET
-  unsigned short * array;   // array for GETALL&SETALL
+  unsigned short * array;   // NOLINT, array for GETALL&SETALL
   struct seminfo * __buf;   // buffer for IPC_INFO
 };
 

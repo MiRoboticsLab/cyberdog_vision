@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Xiaomi Corporation
+// Copyright (c) 2023-2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,36 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
-#define CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
+#ifndef CYBERDOG_VISION__AUTO_TRACK_HPP_
+#define CYBERDOG_VISION__AUTO_TRACK_HPP_
 
 #include <string>
-#include <vector>
 #include <memory>
 
-#include "hand_gesture.h"
-#include "common_type.hpp"
+#include "tracker.hpp"
 
 namespace cyberdog_vision
 {
 
-class GestureRecognition
+class AutoTrack
 {
 public:
-  explicit GestureRecognition(const std::string & model_path);
-  ~GestureRecognition();
+  explicit AutoTrack(const std::string & model_path);
+  ~AutoTrack();
 
-  int GetGestureInfo(
-    const cv::Mat & img, const std::vector<InferBbox> & body_boxes,
-    std::vector<GestureInfo> & infos);
-
-  void SetRecognitionNum(int num);
+  bool SetTracker(const cv::Mat & img, const cv::Rect & bbox);
+  bool Track(const cv::Mat & img, cv::Rect & bbox);
+  void SetLossTh(int loss_th);
+  void ResetTracker();
+  bool GetLostStatus();
 
 private:
-  std::shared_ptr<handgesture::Hand_Gesture> gesture_ptr_;
-  int max_person_num_;
+  std::shared_ptr<TRACKER::Tracker> tracker_ptr_;
+
+  int gpu_id_;
+  int loss_th_;
+  int fail_count_;
+  bool is_init_;
+  bool is_lost_;
 };
 
 }  // namespace cyberdog_vision
 
-#endif  // CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
+#endif  // CYBERDOG_VISION__AUTO_TRACK_HPP_

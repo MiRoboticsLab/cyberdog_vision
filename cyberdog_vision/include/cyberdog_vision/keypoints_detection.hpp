@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Xiaomi Corporation
+// Copyright (c) 2023-2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,39 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CYBERDOG_VISION__AUTO_TRACK_HPP_
-#define CYBERDOG_VISION__AUTO_TRACK_HPP_
+#ifndef CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
+#define CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
 
 #include <string>
+#include <vector>
 #include <memory>
 
-#include "tracker.hpp"
+#include "person_keypoints.h"  // NOLINT
+#include "common_type.hpp"
 
 namespace cyberdog_vision
 {
 
-class AutoTrack
+class KeypointsDetection
 {
 public:
-  explicit AutoTrack(const std::string & model_path);
-  ~AutoTrack();
+  explicit KeypointsDetection(const std::string & model_path);
+  ~KeypointsDetection();
 
-  bool SetTracker(const cv::Mat & img, const cv::Rect & bbox);
-  bool Track(const cv::Mat & img, cv::Rect & bbox);
-  void SetLossTh(int loss_th);
-  void ResetTracker();
-  bool GetLostStatus();
+  void GetKeypointsInfo(
+    const cv::Mat & img, const std::vector<InferBbox> & body_boxes,
+    std::vector<std::vector<cv::Point2f>> & bodies_keypoints);
 
 private:
-  std::shared_ptr<TRACKER::Tracker> tracker_ptr_;
-
-  int gpu_id_;
-  int loss_th_;
-  int fail_count_;
-  bool is_init_;
-  bool is_lost_;
+  std::shared_ptr<Person_keyPoints> keypoints_ptr_;
 };
 
 }  // namespace cyberdog_vision
 
-#endif  // CYBERDOG_VISION__AUTO_TRACK_HPP_
+#endif  // CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_

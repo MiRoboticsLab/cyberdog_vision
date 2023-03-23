@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Xiaomi Corporation
+// Copyright (c) 2023-2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,33 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
-#define CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
+#ifndef CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
+#define CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
 
 #include <string>
 #include <vector>
 #include <memory>
 
-#include "person_keypoints.h"
+#include "hand_gesture.h"  // NOLINT
 #include "common_type.hpp"
 
 namespace cyberdog_vision
 {
 
-class KeypointsDetection
+class GestureRecognition
 {
 public:
-  explicit KeypointsDetection(const std::string & model_path);
-  ~KeypointsDetection();
+  explicit GestureRecognition(const std::string & model_path);
+  ~GestureRecognition();
 
-  void GetKeypointsInfo(
+  int GetGestureInfo(
     const cv::Mat & img, const std::vector<InferBbox> & body_boxes,
-    std::vector<std::vector<cv::Point2f>> & bodies_keypoints);
+    std::vector<GestureInfo> & infos);
+
+  void SetRecognitionNum(int num);
 
 private:
-  std::shared_ptr<Person_keyPoints> keypoints_ptr_;
+  std::shared_ptr<handgesture::Hand_Gesture> gesture_ptr_;
+  int max_person_num_;
 };
 
 }  // namespace cyberdog_vision
 
-#endif  // CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
+#endif  // CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
