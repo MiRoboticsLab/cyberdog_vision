@@ -12,36 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
-#define CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
+#ifndef CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
+#define CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_
 
 #include <string>
 #include <vector>
 #include <memory>
 
-#include "hand_gesture.h"
+#include "3rdparty/person_keypoints.h"
 #include "common_type.hpp"
 
 namespace cyberdog_vision
 {
 
-class GestureRecognition
+class KeypointsDetection
 {
 public:
-  explicit GestureRecognition(const std::string & model_path);
-  ~GestureRecognition();
+  explicit KeypointsDetection(const std::string & model_path);
+  ~KeypointsDetection();
 
-  int GetGestureInfo(
+  void GetKeypointsInfo(
     const cv::Mat & img, const std::vector<InferBbox> & body_boxes,
-    std::vector<GestureInfo> & infos);
-
-  void SetRecognitionNum(int num);
+    std::vector<std::vector<cv::Point2f>> & bodies_keypoints);
 
 private:
-  std::shared_ptr<handgesture::Hand_Gesture> gesture_ptr_;
-  int max_person_num_;
+  std::shared_ptr<Person_keyPoints> keypoints_ptr_;
 };
 
 }  // namespace cyberdog_vision
 
-#endif  // CYBERDOG_VISION__GESTURE_RECOGNITION_HPP_
+#endif  // CYBERDOG_VISION__KEYPOINTS_DETECTION_HPP_

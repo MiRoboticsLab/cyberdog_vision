@@ -42,6 +42,7 @@ find_package(XMREID REQUIRED)
 find_package(XMTRACK REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/3rdparty)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -29,7 +29,7 @@ namespace cyberdog_vision
 union semun {
   int val;    // value for SETVAL
   struct semid_ds * buf;   // buffer for IPC_STAT&IPC_SET
-  unsigned short * array;   // array for GETALL&SETALL
+  unsigned short * array;   // NOLINT, array for GETALL&SETALL
   struct seminfo * __buf;   // buffer for IPC_INFO
 };
 
