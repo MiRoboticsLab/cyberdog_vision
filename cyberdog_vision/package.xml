@@ -9,14 +9,10 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <build_depend>rclcpp</build_depend>
-  <build_depend>rclcpp_lifecycle</build_depend>
-  <build_depend>cyberdog_common</build_depend>
-  <build_depend>protocol</build_depend>
-  <exec_depend>rclcpp</exec_depend>
-  <exec_depend>rclcpp_lifecycle</exec_depend>
-  <exec_depend>cyberdog_common</exec_depend>
-  <exec_depend>protocol</exec_depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>cyberdog_common</depend>
+  <depend>protocol</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
