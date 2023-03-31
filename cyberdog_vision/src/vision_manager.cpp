@@ -1059,6 +1059,15 @@ void VisionManager::AlgoManagerService(
   std::shared_ptr<AlgoManagerT::Response> res)
 {
   INFO("Received algo request. ");
+  if (open_face_ || open_body_ || open_gesture_ || open_keypoints_ || open_reid_ || open_focus_ ||
+    open_face_manager_)
+  {
+    WARN("Algo used was not reset, cannot select new algo.");
+    res->result_enable = AlgoManagerT::Response::ENABLE_FAIL;
+    res->result_disable = AlgoManagerT::Response::DISABLE_FAIL;
+    return;
+  }
+
   for (size_t i = 0; i < req->algo_enable.size(); ++i) {
     SetAlgoState(req->algo_enable[i], true);
   }
