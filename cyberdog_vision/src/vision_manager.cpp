@@ -57,28 +57,6 @@ VisionManager::VisionManager()
   focus_complated_(false)
 {
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
-
-  // Create model object
-  track_model_ = std::make_shared<CyberdogModelT>("auto_track");
-  body_gesture_model_ = std::make_shared<CyberdogModelT>("body_gesture");
-  face_age_model_ = std::make_shared<CyberdogModelT>("face_recognition/age");
-  face_det_model_ = std::make_shared<CyberdogModelT>("face_recognition/detect");
-  face_emotion_model_ = std::make_shared<CyberdogModelT>("face_recognition/emotion");
-  face_feat_model_ = std::make_shared<CyberdogModelT>("face_recognition/feature");
-  face_lmk_model_ = std::make_shared<CyberdogModelT>("face_recognition/landmark");
-  keypoints_model_ = std::make_shared<CyberdogModelT>("keypoints_detection");
-  reid_model_ = std::make_shared<CyberdogModelT>("person_reid");
-
-  auto callback_group = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  rclcpp::SubscriptionOptions sub_options;
-  sub_options.callback_group = callback_group;
-
-  // Create wifi info subscriber
-  auto download_callback = [this](const ConnectorStatusT::SharedPtr msg) {
-      DownloadCallback(msg);
-    };
-  connector_sub_ = create_subscription<ConnectorStatusT>(
-    "connector_state", rclcpp::SystemDefaultsQoS(), download_callback, sub_options);
   INFO("Vision manager constructor complated.");
 }
 
@@ -206,36 +184,6 @@ int VisionManager::InitIPC()
 
 void VisionManager::CreateObjectAI()
 {
-  // Replace with new AI model
-  INFO("Replace AI model.");
-  if (0 != ModelReplace(track_model_)) {
-    INFO("Replace auto track model fail. ");
-  }
-  if (0 != ModelReplace(body_gesture_model_)) {
-    INFO("Replace body gesture model fail. ");
-  }
-  if (0 != ModelReplace(face_age_model_)) {
-    INFO("Replace face age model fail. ");
-  }
-  if (0 != ModelReplace(face_det_model_)) {
-    INFO("Replace face detection model fail. ");
-  }
-  if (0 != ModelReplace(face_emotion_model_)) {
-    INFO("Replace face emotion model fail. ");
-  }
-  if (0 != ModelReplace(face_feat_model_)) {
-    INFO("Replace face feature model fail. ");
-  }
-  if (0 != ModelReplace(face_lmk_model_)) {
-    INFO("Replace face landmarks model fail. ");
-  }
-  if (0 != ModelReplace(keypoints_model_)) {
-    INFO("Replace keypoints model fail. ");
-  }
-  if (0 != ModelReplace(reid_model_)) {
-    INFO("Replace reid model fail. ");
-  }
-
   // Create AI object
   INFO("Create object start. ");
   if (open_body_) {
@@ -1259,48 +1207,6 @@ void VisionManager::FaceDetProc(std::string face_name)
     checkFacePose_Msg = "timeout";
     publishFaceResult(3, checkFacePose_Msg);
   }
-}
-
-void VisionManager::DownloadCallback(const ConnectorStatusT::SharedPtr msg)
-{
-  INFO("Received signal to download model. ");
-  if (msg->is_internet) {
-    INFO("Internet is ready, begin to download model.");
-    ModelDownload(track_model_);
-    ModelDownload(body_gesture_model_);
-    ModelDownload(face_age_model_);
-    ModelDownload(face_det_model_);
-    ModelDownload(face_emotion_model_);
-    ModelDownload(face_feat_model_);
-    ModelDownload(face_lmk_model_);
-    ModelDownload(keypoints_model_);
-    ModelDownload(reid_model_);
-    connector_sub_ = nullptr;
-  } else {
-    ERROR("Internet is not ready will not download. ");
-  }
-}
-
-void VisionManager::ModelDownload(std::shared_ptr<CyberdogModelT> & model)
-{
-  model->SetTimeout(600);
-  int32_t code = model->UpdateModels();
-  if (0 == code) {
-    INFO("Download model from Fds success. ");
-  } else {
-    ERROR("Download model from Fds fail. ");
-  }
-}
-
-int VisionManager::ModelReplace(std::shared_ptr<CyberdogModelT> & model)
-{
-  if (!model->Load_Model_Check()) {
-    WARN("Model check fail.");
-    return -1;
-  }
-
-  model->Post_Process();
-  return 0;
 }
 
 void VisionManager::SetThreadState(const std::string & thread_flag, bool & state)
